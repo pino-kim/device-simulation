@@ -1,0 +1,21 @@
+# Yocto/빌드 산출물(대용량) — 추적 제외, 재현 스크립트/설정만 추적
+sources/
+build/
+qemu-install/
+qemu-8.2.0/
+downloads/
+sstate-cache/
+
+# 대용량 이미지/바이너리/압축
+*.wic
+*.wic.bz2
+*.wic.gz
+*.bin
+*.tar.xz
+*.tar.bz2
+
+# 로그/상태
+*.log
+poc/testshare/result.txt
+poc/boot-full.log
+qemu-Image
