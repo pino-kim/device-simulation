@@ -19,5 +19,6 @@ sstate-cache/
 # 로그/상태
 *.log
 poc/testshare/result.txt
+poc/raspi4b/result.txt
 poc/boot-full.log
 qemu-Image

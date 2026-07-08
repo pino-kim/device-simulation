@@ -12,6 +12,7 @@
   - `run-poc.sh` — 호스트에서 실행. QEMU 부팅 → 9p 마운트 → 테스트 → result.txt 회수 → 종료
   - `drive.expect` — 부팅/로그인/마운트/실행/종료 자동화
   - `testshare/run-tests.sh` — 게스트에서 실행되는 테스트(여기서 앱 바이너리 호출)
+  - `raspi4b/` — **T3 하니스**(BCM2711 SoC). raspi4b엔 9p가 없어 SD rootfs에 바이너리 주입 → 부팅·실행 → 결과 회수. `run-poc-raspi4b.sh`, `drive.expect`, `testfiles/`
 
 ## 사용 (바이너리만 교체해 테스트)
 ```
