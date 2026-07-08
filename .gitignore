@@ -2,7 +2,9 @@
 sources/
 build/
 qemu-install/
+qemu92-install/
 qemu-8.2.0/
+qemu-9.2.0/
 downloads/
 sstate-cache/
 

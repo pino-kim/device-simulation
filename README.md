@@ -4,7 +4,8 @@
 
 ## 구성
 - `run-build.sh` — Yocto(kirkstone) core-image-base 빌드 (crops/yocto 컨테이너 내부에서 실행)
-- `build-qemu.sh` — raspi 지원 확인용 qemu 8.2 소스 빌드 (컨테이너, root)
+- `build-qemu.sh` — qemu 8.2 소스 빌드 (컨테이너, root)
+- `build-qemu92.sh` — qemu 9.2 빌드. **raspi4b(BCM2711) 머신 포함** → T3(SoC 레벨 커널 테스트)용. slirp 포함
 - `build-kernel-virtio.sh` — 커널에 virtio/9p built-in 추가해 재빌드
 - `kernel-overlay/` — 커널 config 프래그먼트(virtio.cfg) + bbappend. 빌드 시 `sources/meta-raspberrypi/recipes-kernel/linux/`에 배치됨
 - `poc/` — 자동테스트 PoC
