@@ -1,0 +1,511 @@
+<title>RPi4 QEMU 자동테스트 — 솔루션 기획서 · 설계도</title>
+<style>
+  :root {
+    --paper: #f7f9f9;
+    --panel: #ffffff;
+    --panel-2: #eef2f2;
+    --ink: #111a1c;
+    --muted: #4d5f62;
+    --faint: #7c8c8e;
+    --line: #d3dcdc;
+    --line-strong: #b7c4c4;
+    --accent: #0e8f8f;
+    --accent-ink: #0a6a6a;
+    --accent-soft: #d5ebeb;
+    --copper: #b26a37;
+    --copper-soft: #f0dfd0;
+    --raspberry: #c51a4a;
+    --ok: #2f8f5b;
+    --warn: #b6851d;
+    --crit: #c0492f;
+    --code-bg: #0f1a1c;
+    --code-ink: #cfe3e3;
+    --shadow: 0 1px 2px rgba(17,26,28,.05), 0 8px 24px rgba(17,26,28,.05);
+    --font-display: "Helvetica Neue", "Segoe UI", ui-sans-serif, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "D2Coding", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0d1416;
+      --panel: #121d20;
+      --panel-2: #16232610;
+      --ink: #e6efef;
+      --muted: #9fb2b3;
+      --faint: #6f8284;
+      --line: #223034;
+      --line-strong: #2e4045;
+      --accent: #2ec7c7;
+      --accent-ink: #57d6d6;
+      --accent-soft: #10312f;
+      --copper: #d98f56;
+      --copper-soft: #2a1f16;
+      --raspberry: #ff5c81;
+      --ok: #4bbd79;
+      --warn: #d8ad3f;
+      --crit: #e46a4f;
+      --code-bg: #0a1315;
+      --code-ink: #bcd6d6;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f7f9f9; --panel: #ffffff; --panel-2: #eef2f2; --ink: #111a1c; --muted: #4d5f62;
+    --faint: #7c8c8e; --line: #d3dcdc; --line-strong: #b7c4c4; --accent: #0e8f8f; --accent-ink: #0a6a6a;
+    --accent-soft: #d5ebeb; --copper: #b26a37; --copper-soft: #f0dfd0; --raspberry: #c51a4a;
+    --ok: #2f8f5b; --warn: #b6851d; --crit: #c0492f; --code-bg: #0f1a1c; --code-ink: #cfe3e3;
+  }
+  :root[data-theme="dark"] {
+    --paper: #0d1416; --panel: #121d20; --panel-2: #16232610; --ink: #e6efef; --muted: #9fb2b3;
+    --faint: #6f8284; --line: #223034; --line-strong: #2e4045; --accent: #2ec7c7; --accent-ink: #57d6d6;
+    --accent-soft: #10312f; --copper: #d98f56; --copper-soft: #2a1f16; --raspberry: #ff5c81;
+    --ok: #4bbd79; --warn: #d8ad3f; --crit: #e46a4f; --code-bg: #0a1315; --code-ink: #bcd6d6;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body);
+    line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px 96px; }
+
+  a { color: var(--accent-ink); }
+  code, .mono { font-family: var(--font-mono); }
+
+  /* ---- masthead ---- */
+  .masthead { padding: 56px 0 28px; border-bottom: 1px solid var(--line); }
+  .kicker { font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent-ink); display: flex; align-items: center; gap: 10px; }
+  .kicker::before { content: ""; width: 22px; height: 2px; background: var(--accent); display: inline-block; }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.05; letter-spacing: -.02em; margin: 18px 0 10px; text-wrap: balance; }
+  .lede { font-size: 18px; color: var(--muted); max-width: 62ch; margin: 0; }
+
+  .spec { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 34px;
+    background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .spec div { background: var(--panel); padding: 14px 16px; }
+  .spec dt { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); margin: 0 0 5px; }
+  .spec dd { margin: 0; font-size: 14px; font-weight: 600; }
+  .spec dd.ok { color: var(--ok); }
+
+  /* ---- sections ---- */
+  section { padding-top: 52px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--faint); display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .eyebrow b { color: var(--accent-ink); font-weight: 700; }
+  h2 { font-family: var(--font-display); font-weight: 750; font-size: 26px; letter-spacing: -.01em;
+    margin: 0 0 14px; text-wrap: balance; }
+  h3 { font-size: 15px; font-weight: 700; margin: 26px 0 8px; letter-spacing: -.005em; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  .muted { color: var(--muted); }
+
+  /* ---- problem / goal split ---- */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px;
+    box-shadow: var(--shadow); }
+  .card .tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--faint); margin-bottom: 10px; }
+  .card.pain .tag { color: var(--crit); }
+  .card.goal .tag { color: var(--ok); }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { margin-bottom: 7px; }
+  .card li::marker { color: var(--line-strong); }
+
+  /* ---- diagram frames ---- */
+  .figure { margin: 8px 0 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    box-shadow: var(--shadow); overflow: hidden; }
+  .figure .cap { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 11px 18px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+  .figure .cap b { font-size: 13px; font-weight: 700; }
+  .figure .cap span { font-family: var(--font-mono); font-size: 11px; color: var(--faint); letter-spacing: .06em; }
+  .figscroll { overflow-x: auto; padding: 22px; }
+  svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+  figcaption { font-size: 13px; color: var(--faint); margin: 10px 2px 0; }
+
+  /* svg semantic classes */
+  .s-fill { fill: var(--panel); }
+  .s-fill-2 { fill: var(--panel-2); }
+  .s-line { stroke: var(--line-strong); }
+  .s-ink { fill: var(--ink); }
+  .s-muted { fill: var(--muted); }
+  .s-mono { font-family: var(--font-mono); }
+  .s-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em; fill: var(--faint); }
+  .s-title { font-family: var(--font-body); font-weight: 700; fill: var(--ink); }
+  .s-body { font-family: var(--font-body); fill: var(--muted); font-size: 12px; }
+  .trace { stroke: var(--copper); fill: none; stroke-width: 1.6; }
+  .trace-arrow { fill: var(--copper); }
+  .accent-stroke { stroke: var(--accent); }
+  .accent-fill { fill: var(--accent); }
+
+  /* ---- step flow ---- */
+  .steps { counter-reset: st; display: grid; gap: 10px; }
+  .step { display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 13px 16px; }
+  .step::before { counter-increment: st; content: counter(st); font-family: var(--font-mono); font-weight: 700;
+    font-size: 13px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 6px;
+    width: 30px; height: 30px; display: grid; place-items: center; }
+  .step h4 { margin: 3px 0 2px; font-size: 14px; }
+  .step p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .step .cmd { font-family: var(--font-mono); font-size: 12px; color: var(--accent-ink); }
+
+  /* ---- results ---- */
+  .terminal { background: var(--code-bg); border-radius: 10px; padding: 18px 20px; overflow-x: auto;
+    border: 1px solid var(--line-strong); }
+  .terminal pre { margin: 0; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7; color: var(--code-ink); }
+  .terminal .g { color: #5fd39a; } .terminal .c { color: #63c9c9; } .terminal .d { color: #6f8284; }
+
+  .results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0 0; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; }
+  .stat .n { font-family: var(--font-display); font-weight: 800; font-size: 24px; letter-spacing: -.01em; }
+  .stat .n.ok { color: var(--ok); }
+  .stat .l { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--faint); margin-top: 4px; }
+
+  /* ---- limits banner ---- */
+  .limits { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line);
+    border-radius: 8px; overflow: hidden; }
+  .limits > div { padding: 18px 20px; }
+  .limits .yes { background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
+  .limits .no { background: color-mix(in srgb, var(--crit) 8%, var(--panel)); border-left: 1px solid var(--line); }
+  .limits h4 { margin: 0 0 10px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .limits .yes h4 { color: var(--ok); } .limits .no h4 { color: var(--crit); }
+  .limits ul { margin: 0; padding-left: 17px; font-size: 13.5px; color: var(--muted); }
+  .limits li { margin-bottom: 6px; }
+
+  /* ---- roadmap ---- */
+  .road { display: grid; gap: 14px; }
+  .lane { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+  .lane-head { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--line);
+    background: var(--panel-2); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .lane-head b { font-size: 13.5px; }
+  .lane-head .when { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--faint); margin-left: auto; }
+  .lane ol { margin: 0; padding: 10px 16px 14px 34px; }
+  .lane li { margin-bottom: 8px; font-size: 14px; }
+  .lane li b { font-weight: 700; }
+  .lane li span { color: var(--muted); }
+  .pill { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; padding: 2px 7px; border-radius: 999px;
+    border: 1px solid var(--line-strong); color: var(--faint); margin-left: 6px; white-space: nowrap; }
+
+  /* ---- coverage tiers ladder ---- */
+  .tiers { display: grid; gap: 10px; }
+  .tier { display: grid; grid-template-columns: 52px 1fr auto; gap: 16px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px;
+    border-left: 3px solid var(--line-strong); }
+  .tier.t-now { border-left-color: var(--ok); }
+  .tier.t-part { border-left-color: var(--warn); }
+  .tier.t-board { border-left-color: var(--crit); }
+  .tier .tno { font-family: var(--font-mono); font-weight: 700; font-size: 15px; color: var(--faint); }
+  .tier .body h4 { margin: 0 0 3px; font-size: 14.5px; }
+  .tier .body p { margin: 0; font-size: 13px; color: var(--muted); }
+  .tier .body .how { font-family: var(--font-mono); font-size: 11px; color: var(--accent-ink); }
+  .badge { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap; font-weight: 600; }
+  .badge.now { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .badge.part { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .badge.board { background: color-mix(in srgb, var(--crit) 14%, transparent); color: var(--crit); }
+  @media (max-width: 720px) {
+    .tier { grid-template-columns: 40px 1fr; }
+    .tier .badge { grid-column: 2; justify-self: start; }
+  }
+
+  hr.rule { border: 0; border-top: 1px solid var(--line); margin: 0; }
+  .foot { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line); font-family: var(--font-mono);
+    font-size: 11.5px; color: var(--faint); display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between; }
+
+  @media (max-width: 720px) {
+    .spec { grid-template-columns: repeat(2, 1fr); }
+    .split, .results-grid, .limits { grid-template-columns: 1fr; }
+    .limits .no { border-left: 0; border-top: 1px solid var(--line); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .step, .stat, .card { transition: border-color .2s ease; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="kicker">Solution Brief · Embedded CI</div>
+    <h1>실물 보드 없이, QEMU로 라즈베리파이4 이미지를 돌리는 자동테스트 파이프라인</h1>
+    <p class="lede">보드용 Yocto 이미지를 그대로 QEMU에 부팅하고, 앱 바이너리만 교체해 회귀 테스트를 자동화한다. 개발 피드백 루프에서 물리 보드 의존을 걷어내는 것이 목표다.</p>
+
+    <dl class="spec">
+      <div><dt>Target</dt><dd>Raspberry Pi 4 · aarch64</dd></div>
+      <div><dt>Stack</dt><dd>Yocto kirkstone · QEMU 8.2</dd></div>
+      <div><dt>PoC</dt><dd class="ok">검증 완료 · 동작 확인</dd></div>
+      <div><dt>Jira</dt><dd>BSP-17</dd></div>
+    </dl>
+  </header>
+
+  <!-- 1. 배경 & 목표 -->
+  <section>
+    <div class="eyebrow"><b>01</b> 배경 &amp; 목표</div>
+    <h2>왜 필요한가</h2>
+    <p class="muted">임베디드 개발은 코드를 고칠 때마다 실물 보드에 플래싱하고 손으로 확인해야 한다. 보드 수가 한정되고, 플래싱·부팅이 느리며, 병렬 테스트와 CI 자동화가 어렵다. 앱 로직 수준의 회귀는 대부분 하드웨어가 아니라 유저스페이스에서 잡히는데도, 매번 보드를 붙잡는다.</p>
+    <div class="split">
+      <div class="card pain">
+        <div class="tag">문제</div>
+        <ul>
+          <li>수정 → 플래싱 → 수동 확인의 느린 루프</li>
+          <li>보드 대수 제약으로 병렬·야간 테스트 불가</li>
+          <li>PR마다 자동 회귀 검증이 없음</li>
+          <li>유저스페이스 버그도 보드에서만 확인</li>
+        </ul>
+      </div>
+      <div class="card goal">
+        <div class="tag">목표</div>
+        <ul>
+          <li>보드 이미지를 QEMU에서 그대로 부팅</li>
+          <li>이미지 재빌드 없이 <b>앱 바이너리만 교체</b></li>
+          <li>부팅→테스트→결과회수를 한 명령으로</li>
+          <li>CI에 붙여 PR마다 자동 회귀</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 시스템 아키텍처 -->
+  <section>
+    <div class="eyebrow"><b>02</b> 설계도 · 시스템 아키텍처</div>
+    <h2>구성 요소와 격리 계층</h2>
+    <p class="muted">낡은 호스트(Ubuntu 16.04 / Python 3.5)를 건드리지 않도록 빌드·실행을 Docker로 격리한다. QEMU는 <code>-M virt</code> 범용 머신에 보드 rootfs와 virtio를 켠 커널을 올리고, 호스트와 게스트는 9p 파일 공유로 이어 바이너리와 결과를 주고받는다.</p>
+    <figure class="figure">
+      <div class="cap"><b>Runtime Architecture</b><span>host → docker → qemu → guest</span></div>
+      <div class="figscroll">
+        <svg viewBox="0 0 860 430" role="img" aria-label="시스템 아키텍처 다이어그램">
+          <!-- host -->
+          <rect x="12" y="12" width="836" height="406" rx="12" class="s-fill-2 s-line" stroke-width="1.4"/>
+          <text x="30" y="38" class="s-label">HOST · UBUNTU 16.04 · /data/yocto-rpi4 (8.9T)</text>
+
+          <!-- docker container -->
+          <rect x="30" y="52" width="620" height="350" rx="10" class="s-fill s-line" stroke-width="1.4"/>
+          <text x="48" y="78" class="s-label">DOCKER · crops/yocto:ubuntu-22.04 · --security-opt seccomp=unconfined</text>
+
+          <!-- qemu -->
+          <rect x="50" y="92" width="580" height="292" rx="9" fill="none" class="accent-stroke" stroke-width="1.6" stroke-dasharray="5 4"/>
+          <text x="66" y="116" class="s-mono" font-size="10.5" letter-spacing=".08em" fill="var(--accent-ink)">QEMU 8.2 · -M virt · -cpu cortex-a72 · -m 2048</text>
+
+          <!-- guest -->
+          <rect x="70" y="132" width="540" height="234" rx="8" class="s-fill-2 s-line" stroke-width="1.4"/>
+          <text x="88" y="158" class="s-label">GUEST · 에뮬된 보드</text>
+
+          <!-- kernel -->
+          <rect x="90" y="172" width="220" height="80" rx="7" class="s-fill s-line" stroke-width="1.3"/>
+          <text x="104" y="196" class="s-title" font-size="13">Linux 5.15.92</text>
+          <text x="104" y="216" class="s-body">virtio-blk / virtio-pci</text>
+          <text x="104" y="234" class="s-body">pci-host-generic / 9p</text>
+
+          <!-- rootfs -->
+          <rect x="90" y="264" width="220" height="82" rx="7" class="s-fill" stroke-width="1.3" stroke="var(--raspberry)"/>
+          <text x="104" y="288" class="s-title" font-size="13">보드 rootfs</text>
+          <text x="104" y="308" class="s-body">core-image-base (그대로)</text>
+          <text x="104" y="326" class="s-body">/dev/vda2 · getty@ttyAMA0</text>
+
+          <!-- test agent inside guest -->
+          <rect x="340" y="172" width="248" height="174" rx="7" class="s-fill s-line" stroke-width="1.3"/>
+          <text x="356" y="196" class="s-title" font-size="13">테스트 실행부</text>
+          <text x="356" y="216" class="s-body">/mnt/host ← 9p 마운트</text>
+          <text x="356" y="236" class="s-body">run-tests.sh</text>
+          <text x="356" y="256" class="s-body s-mono" font-size="11">└ ./myapp --selftest</text>
+          <rect x="356" y="272" width="216" height="56" rx="6" class="s-fill-2 s-line" stroke-width="1.2"/>
+          <text x="370" y="294" class="s-body" font-size="11.5">결과를 result.txt로 기록 →</text>
+          <text x="370" y="312" class="s-body" font-size="11.5">9p 통해 호스트로 회수</text>
+
+          <!-- host-side share -->
+          <rect x="678" y="150" width="150" height="200" rx="9" class="s-fill s-line" stroke-width="1.4"/>
+          <text x="694" y="176" class="s-label">HOST SHARE</text>
+          <text x="694" y="202" class="s-title" font-size="12.5">poc/testshare/</text>
+          <text x="694" y="224" class="s-body" font-size="11.5">myapp ▲ 넣기</text>
+          <text x="694" y="244" class="s-body" font-size="11.5">run-tests.sh</text>
+          <text x="694" y="264" class="s-body" font-size="11.5">result.txt ▼ 회수</text>
+
+          <!-- 9p bridge -->
+          <path d="M588 259 H678" class="trace" stroke-width="2"/>
+          <path d="M678 259 l-9 -4 v8 z" class="trace-arrow"/>
+          <path d="M678 240 H588" class="trace" stroke-width="2"/>
+          <path d="M588 240 l9 -4 v8 z" class="trace-arrow"/>
+          <text x="602" y="292" class="s-mono" font-size="10" fill="var(--copper)">9p / virtfs</text>
+        </svg>
+      </div>
+    </figure>
+    <figcaption>격리 계층: 호스트를 오염시키지 않고, 컨테이너 안에서 QEMU가 보드 rootfs를 부팅한다. 파란 점선이 QEMU 경계, 붉은 테두리가 “보드 그대로”인 rootfs, 구리색이 9p 데이터 통로다. 부팅 머신은 <code>-M virt</code>(T1·T2, 9p 자동테스트) 또는 <code>raspi4b</code>(T3 — QEMU 9.x mainline, BCM2711 SoC까지 실제 부팅·로그인 확인). 06 참조.</figcaption>
+  </section>
+
+  <!-- 3. 빌드 파이프라인 -->
+  <section>
+    <div class="eyebrow"><b>03</b> 설계도 · 빌드 파이프라인</div>
+    <h2>이미지와 커널이 만들어지는 경로</h2>
+    <figure class="figure">
+      <div class="cap"><b>Build Pipeline</b><span>yocto kirkstone → wic + kernel</span></div>
+      <div class="figscroll">
+        <svg viewBox="0 0 860 250" role="img" aria-label="빌드 파이프라인 다이어그램">
+          <!-- sources -->
+          <rect x="14" y="70" width="176" height="110" rx="8" class="s-fill s-line" stroke-width="1.3"/>
+          <text x="30" y="96" class="s-label">SOURCES · kirkstone</text>
+          <text x="30" y="120" class="s-body" font-size="12.5">poky 4.0.35</text>
+          <text x="30" y="140" class="s-body" font-size="12.5">meta-raspberrypi</text>
+          <text x="30" y="160" class="s-body" font-size="12.5">meta-openembedded</text>
+
+          <!-- overlay -->
+          <rect x="14" y="192" width="176" height="46" rx="8" class="s-fill-2" stroke="var(--accent)" stroke-width="1.3"/>
+          <text x="30" y="212" class="s-mono" font-size="10.5" fill="var(--accent-ink)">kernel-overlay/</text>
+          <text x="30" y="228" class="s-body" font-size="11">virtio.cfg + .bbappend</text>
+
+          <!-- bitbake -->
+          <rect x="330" y="70" width="190" height="110" rx="8" class="s-fill s-line" stroke-width="1.3"/>
+          <text x="348" y="96" class="s-label">BITBAKE · in docker</text>
+          <text x="348" y="120" class="s-title" font-size="13">core-image-base</text>
+          <text x="348" y="140" class="s-body" font-size="12">MACHINE=raspberrypi4-64</text>
+          <text x="348" y="160" class="s-body" font-size="12">4014 tasks · 0 error</text>
+
+          <!-- outputs -->
+          <rect x="662" y="40" width="184" height="72" rx="8" class="s-fill" stroke="var(--raspberry)" stroke-width="1.3"/>
+          <text x="678" y="64" class="s-label">이미지</text>
+          <text x="678" y="88" class="s-title" font-size="12.5">core-image-base.wic.bz2</text>
+          <text x="678" y="104" class="s-body" font-size="11.5">64M · SD 플래싱용</text>
+
+          <rect x="662" y="128" width="184" height="82" rx="8" class="s-fill s-line" stroke-width="1.3"/>
+          <text x="678" y="152" class="s-label">커널 · DTB</text>
+          <text x="678" y="176" class="s-title" font-size="12.5">Image (22M)</text>
+          <text x="678" y="194" class="s-body" font-size="11.5">bcm2711-rpi-4-b.dtb</text>
+
+          <!-- traces -->
+          <path d="M190 125 H330" class="trace"/>
+          <path d="M330 125 l-9 -4 v8 z" class="trace-arrow"/>
+          <path d="M190 214 C 250 214, 250 150, 330 150" class="trace" stroke-dasharray="4 3"/>
+          <path d="M330 150 l-9 -4 v8 z" class="trace-arrow"/>
+          <path d="M520 110 C 590 110, 600 76, 662 76" class="trace"/>
+          <path d="M662 76 l-9 -4 v8 z" class="trace-arrow"/>
+          <path d="M520 150 C 590 150, 600 168, 662 168" class="trace"/>
+          <path d="M662 168 l-9 -4 v8 z" class="trace-arrow"/>
+        </svg>
+      </div>
+    </figure>
+    <figcaption>표준 Yocto 빌드에 커널 오버레이(virtio 활성화)만 얹는다. 산출물은 실물 보드용 <code>.wic.bz2</code>와 QEMU 부팅용 커널 <code>Image</code>로 동시에 쓰인다 — 같은 이미지가 보드에도, 에뮬에도.</figcaption>
+  </section>
+
+  <!-- 4. 테스트 실행 플로우 -->
+  <section>
+    <div class="eyebrow"><b>04</b> 설계도 · 테스트 실행 플로우</div>
+    <h2>한 명령이 하는 일</h2>
+    <p class="muted"><code>bash poc/run-poc.sh</code> 하나로 아래 순서가 자동 실행된다. 사람이 개입하는 지점은 오직 <b>바이너리를 testshare/에 넣는 것</b>뿐이다.</p>
+    <div class="steps">
+      <div class="step"><div><h4>바이너리 배치</h4><p><span class="cmd">cp myapp poc/testshare/</span> — 교체 대상은 이 폴더 하나. 이미지 재빌드 없음.</p></div></div>
+      <div class="step"><div><h4>QEMU 부팅</h4><p>보드 커널 + rootfs를 <span class="cmd">-M virt</span>로 기동. 시리얼 콘솔(ttyAMA0)로 로그인 프롬프트까지 진행.</p></div></div>
+      <div class="step"><div><h4>자동 로그인</h4><p>expect가 <span class="cmd">root@raspberrypi4-64</span> 셸에 진입(무비번).</p></div></div>
+      <div class="step"><div><h4>9p 마운트</h4><p>호스트 <span class="cmd">testshare/</span>를 게스트 <span class="cmd">/mnt/host</span>에 연결.</p></div></div>
+      <div class="step"><div><h4>테스트 실행</h4><p><span class="cmd">run-tests.sh</span>가 앱 바이너리를 실행하고 출력을 <span class="cmd">result.txt</span>에 기록.</p></div></div>
+      <div class="step"><div><h4>결과 회수 &amp; 종료</h4><p>result.txt가 9p로 호스트에 즉시 남고, <span class="cmd">poweroff</span>로 깨끗이 종료.</p></div></div>
+    </div>
+  </section>
+
+  <!-- 5. 검증 결과 -->
+  <section>
+    <div class="eyebrow"><b>05</b> 검증 결과 · PoC</div>
+    <h2>실제로 돌았다</h2>
+    <div class="results-grid">
+      <div class="stat"><div class="n ok">부팅 OK</div><div class="l">login reached</div></div>
+      <div class="stat"><div class="n ok">9p 마운트</div><div class="l">binary in / result out</div></div>
+      <div class="stat"><div class="n ok">PASS</div><div class="l">result.txt 회수</div></div>
+    </div>
+    <h3>게스트(에뮬 보드) 안에서 나온 실제 출력</h3>
+    <div class="terminal"><pre><span class="d"># poc/testshare/result.txt — 게스트에서 실행되어 호스트로 회수됨</span>
+<span class="c">=== 게스트 자동테스트 시작 ===</span>
+uname : Linux <span class="g">raspberrypi4-64</span> 5.15.92-v8 ... <span class="g">aarch64</span> GNU/Linux
+arch  : aarch64
+<span class="g">PASS</span>: 샘플 테스트 통과
+<span class="c">=== 게스트 자동테스트 종료 ===</span></pre></div>
+    <figcaption>실제 보드 커널(5.15.92-v8)과 보드 rootfs(hostname raspberrypi4-64)가 QEMU에서 부팅되어, 그 안에서 테스트가 실행되고 결과가 호스트로 돌아왔다. (위는 <code>-M virt</code> · T1·T2)</figcaption>
+
+    <h3>T3 · raspi4b — BCM2711 SoC까지 로그인 부팅</h3>
+    <div class="terminal"><pre><span class="d"># -M raspi4b (QEMU 9.2 mainline) + 실제 보드 DTB(bcm2711-rpi-4-b)</span>
+Machine model: <span class="g">Raspberry Pi 4 Model B</span>
+earlycon: pl11 at MMIO <span class="c">0xfe201000</span>        <span class="d"># BCM2711 실주소</span>
+bcm2835-mbox fe00b880.mailbox: mailbox enabled  <span class="d"># VideoCore 메일박스</span>
+bcm2835-dma  fe007000.dma: DMA legacy API manager
+mmcblk1: mmc1 QEMU! 512 MiB  p1 p2              <span class="d"># 실제 MMC 컨트롤러</span>
+EXT4-fs (mmcblk1p2): mounted filesystem
+Run /sbin/init as init process
+<span class="g">raspberrypi4-64 login:</span>                        <span class="d"># 로그인 도달</span>
+<span class="d"># degrade(미에뮬): PCIe · genet 이더넷 · VideoCore GPU · 카메라</span></pre></div>
+    <figcaption>T3 실증: 실제 Pi4 커널이 에뮬된 BCM2711 SoC 위에서 보드 DTB로 부팅, MMC/메일박스/DMA/GPIO 등 Pi 전용 드라이버가 실제 probe되고 로그인까지 도달. 미에뮬 주변장치는 QEMU가 DTB에서 disable해 부팅을 막지 않는다.</figcaption>
+  </section>
+
+  <!-- 6. 범위와 한계 -->
+  <section>
+    <div class="eyebrow"><b>06</b> 커버리지 층위</div>
+    <h2>어디까지 QEMU로, 어디부터 보드로</h2>
+    <p class="muted">테스트는 유저스페이스만이 아니라 <b>커널 레벨</b>도 있다. 중요한 점: 이 환경은 <b>실제 라즈베리파이4 커널(5.15.92)을 그대로 QEMU에 올린다</b> — 다만 부팅 머신(<code>-M virt</code> vs <code>raspi4b</code>)에 따라 커널의 어느 계층까지 실제로 실행되는지가 갈린다. 아래는 그 사다리다.</p>
+    <div class="tiers">
+      <div class="tier t-now">
+        <div class="tno">T1</div>
+        <div class="body"><h4>유저스페이스</h4>
+          <p>앱 로직 · 파일시스템 · 프로세스/IPC · 라이브러리 회귀 · 서비스 기동</p>
+          <p class="how">-M virt · 지금 동작</p></div>
+        <span class="badge now">지금 됨</span>
+      </div>
+      <div class="tier t-now">
+        <div class="tno">T2</div>
+        <div class="body"><h4>커널 · 제네릭</h4>
+          <p>실제 Pi4 커널 부팅 · 서브시스템 · syscall · 로더블 모듈(.ko) · virtio·블록·네트워크 스택</p>
+          <p class="how">-M virt + 실제 Pi4 커널 · 지금 동작</p></div>
+        <span class="badge now">지금 됨</span>
+      </div>
+      <div class="tier t-part">
+        <div class="tno">T3</div>
+        <div class="body"><h4>커널 · SoC/보드 특화</h4>
+          <p>BCM2711 드라이버 · 보드 DTB(bcm2711-rpi-4-b) · mailbox·DMA·GPIO·mmc·clock 등 Pi 전용 커널 경로 — <b>로그인까지 부팅 확인</b></p>
+          <p class="how">QEMU 9.x raspi4b (mainline · 패치 불필요) · 미에뮬 장치(GPU·이더넷·PCIe)는 degrade</p></div>
+        <span class="badge part">검증됨 · 일부 HW 제외</span>
+      </div>
+      <div class="tier t-board">
+        <div class="tno">T4</div>
+        <div class="body"><h4>물리 하드웨어</h4>
+          <p>GPIO 전기적 핀 · 카메라 · VideoCore GPU · 실제 센서 · 전력·타이밍·열 특성</p>
+          <p class="how">에뮬 불가 · 실물 보드 전용</p></div>
+        <span class="badge board">실물 보드</span>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:16px">T1·T2는 오늘 CI로 자동화 가능(회귀의 대부분). <b>T3도 실증 완료</b> — QEMU 9.x의 <code>raspi4b</code>(mainline, 패치 불필요)로 실제 Pi4 커널+보드 DTB가 <b>로그인까지 부팅</b>했고 BCM2711 드라이버(mailbox·DMA·GPIO·mmc)가 실제로 probe됐다. 미에뮬 주변장치(GPU·카메라·genet 이더넷·PCIe)는 커널이 우아하게 degrade한다. T4만 실물 보드로 남긴다. 즉 <b>대체가 아니라, 커널까지 끌어올린 보완</b>이다.</p>
+  </section>
+
+  <!-- 7. 로드맵 -->
+  <section>
+    <div class="eyebrow"><b>07</b> 로드맵 · TBD</div>
+    <h2>다음 단계</h2>
+    <div class="road">
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--crit)"></span><b>지금 · 작고 확실</b><span class="when">now</span></div>
+        <ol>
+          <li><b>실제 앱 바이너리 검증</b> <span>— 샘플 대신 진짜 aarch64 바이너리로 확인</span><span class="pill">S</span></li>
+          <li><b>원격 저장소 push</b> <span>— 로컬 git → GitHub/GitLab 연결</span><span class="pill">S</span></li>
+        </ol>
+      </div>
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--warn)"></span><b>다음 · CI로 만들기</b><span class="when">next</span></div>
+        <ol>
+          <li><b>CI 파이프라인 템플릿</b> <span>— GitHub Actions/Jenkins에서 run-poc.sh → result.txt/종료코드로 pass·fail</span><span class="pill">M</span></li>
+          <li><b>정석 이미지화</b> <span>— inittab 사후 패치 제거, 커스텀 레이어에 SERIAL_CONSOLES·virtio 반영</span><span class="pill">M</span></li>
+          <li><b>Yocto testimage 연동</b> <span>— 자작 expect → 공식 테스트 프레임워크</span><span class="pill">M–L</span></li>
+          <li><b>raspi4b 자동테스트 하니스 (T3)</b> <span>— 부팅은 검증 완료(QEMU 9.x mainline). 9p가 없어 SD 이미지에 바이너리 주입하는 하니스 필요</span><span class="pill">M</span></li>
+        </ol>
+      </div>
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--ok)"></span><b>나중 · 고도화</b><span class="when">later</span></div>
+        <ol>
+          <li><b>네트워킹 복구</b> <span>— qemu를 slirp 포함 재빌드 → ssh/scp · 네트워크 테스트</span><span class="pill">M</span></li>
+          <li><b>부팅 시간 단축</b> <span>— qemu snapshot으로 매 테스트 풀부팅 회피</span><span class="pill">M</span></li>
+          <li><b>하드웨어 갭 전략</b> <span>— GPIO/센서 mock + 주기적 실물 HIL 하이브리드</span><span class="pill">L</span></li>
+        </ol>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:16px">추천 경로: <b>실제 바이너리 → CI 템플릿 → 정석 이미지화</b>. 개념 확증 → 자동화 가치 → 유지보수성 순.</p>
+  </section>
+
+  <div class="foot">
+    <span>device_simulation · RPi4 Yocto+QEMU CI · Solution Brief</span>
+    <span>산출물 /data/yocto-rpi4 · Jira BSP-17</span>
+  </div>
+
+</div>
