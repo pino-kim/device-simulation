@@ -124,15 +124,34 @@ QEMU `raspi4b`에서는 DT의 UART 번호 배치에 맞춰 커널 명령행을
 변경한 파일이 다음 부팅에도 유지된다. 원본 빌드 이미지로 초기화하려면 다음과
 같이 실행한다.
 
-QEMU에서는 SD 카드가 `/dev/mmcblk1`, PL011 콘솔이 `ttyAMA1`로 등록된다.
-반면 실물 보드용 이미지의 `/etc/fstab`과 getty는 각각 `mmcblk0`,
-`ttyAMA0`을 기다리므로 systemd 부팅이 지연된다. 대화형 실행은
-`init=/bin/sh`로 이 실물 전용 초기화를 건너뛰고 root 셸에 직접 연결한다.
+`run-rpi4-console.sh`는 QEMU `raspi4b`의 BCM2711, DTB와 MMC rootfs를
+사용한다. QEMU 전용 PTY를 만들고 `stty`로 115200 baud, raw, no-echo를
+설정한 뒤 `screen`으로 PL011 `ttyAMA0` 콘솔에 직접 연결한다.
 필요한 가상 파일시스템은 접속 후 다음처럼 마운트할 수 있다.
 
 ```bash
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
+```
+
+`screen` 종료는 `Ctrl+A`, `\`를 차례로 누른다. CM3의
+`raspi3b`/`ttyAMA0`에서 사용했던 것과 같은 연결 방식이다.
+
+원본 RPi4 DTB는 PL011 아래의 Bluetooth serdev child가 활성화되어 있어
+커널 드라이버가 RX FIFO를 읽더라도 일반 TTY 입력으로 전달되지 않는다.
+Yocto 커널 recipe는 원본 DTB를 유지하면서 PL011을
+`serial0`/`ttyAMA0`으로 지정하고 해당 Bluetooth child만 비활성화한
+`bcm2711-rpi-4-b-qemu-console.dtb`를 별도 deploy한다. 실행 스크립트는
+이 QEMU 전용 산출물을 사용한다. QEMU PL011 trace에서 PTY 입력, RX FIFO
+적재, IRQ assert, Linux FIFO read와 셸 명령 실행까지 확인했다.
+
+RX 경로를 다시 검증하려면 다음을 실행한다. `INPUT_EOL=cr` 또는
+`INPUT_EOL=lf`로 입력 종단 문자를 각각 확인할 수 있고, 결과는
+`qemu-pl011-trace.log`, `qemu-rpi4-debug.log`,
+`qemu-rpi4-console.log`에 저장된다.
+
+```bash
+INPUT_EOL=cr ./debug-rpi4-pl011-rx.sh
 ```
 
 ```bash

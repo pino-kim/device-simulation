@@ -46,5 +46,5 @@ bitbake core-image-base
 
 echo "===== Build artifacts ====="
 find "$DEPLOY_DIR" -maxdepth 1 \
-    \( -name 'Image*' -o -name 'bcm2711-rpi-4-b.dtb' -o -name '*.wic' -o -name '*.wic.bz2' \) \
+    \( -name 'Image*' -o -name 'bcm2711-rpi-4-b*.dtb' -o -name '*.wic' -o -name '*.wic.bz2' \) \
     -printf '%f\n' | sort
