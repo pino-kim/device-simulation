@@ -124,6 +124,17 @@ QEMU `raspi4b`에서는 DT의 UART 번호 배치에 맞춰 커널 명령행을
 변경한 파일이 다음 부팅에도 유지된다. 원본 빌드 이미지로 초기화하려면 다음과
 같이 실행한다.
 
+QEMU에서는 SD 카드가 `/dev/mmcblk1`, PL011 콘솔이 `ttyAMA1`로 등록된다.
+반면 실물 보드용 이미지의 `/etc/fstab`과 getty는 각각 `mmcblk0`,
+`ttyAMA0`을 기다리므로 systemd 부팅이 지연된다. 대화형 실행은
+`init=/bin/sh`로 이 실물 전용 초기화를 건너뛰고 root 셸에 직접 연결한다.
+필요한 가상 파일시스템은 접속 후 다음처럼 마운트할 수 있다.
+
+```bash
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+```
+
 ```bash
 RESET_WIC=1 ./run-rpi4-console.sh
 ```

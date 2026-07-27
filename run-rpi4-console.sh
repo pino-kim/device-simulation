@@ -42,4 +42,4 @@ exec "$QEMU_BIN" \
     -kernel "$KERNEL" \
     -dtb "$DTB" \
     -drive "file=$CONSOLE_WIC,format=raw,if=sd" \
-    -append "console=ttyAMA1,115200 earlycon=pl011,0xfe201000 root=/dev/mmcblk1p2 rootwait rw"
+    -append "console=ttyAMA1,115200 earlycon=pl011,0xfe201000 root=/dev/mmcblk1p2 rootwait rw init=/bin/sh"
