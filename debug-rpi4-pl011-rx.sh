@@ -11,7 +11,7 @@ done
 
 KERNEL="${KERNEL:-$(find_single_artifact 'Image-raspberrypi4-64.bin')}"
 DTB="${DTB:-$(find_single_artifact 'bcm2711-rpi-4-b-qemu-console.dtb')}"
-SOURCE_WIC="${WIC:-$(find_single_artifact 'core-image-base-raspberrypi4-64*.wic')}"
+SOURCE_WIC="${WIC:-$(find_single_artifact 'core-image-base-qemu-rpi4-raspberrypi4-64*.wic')}"
 DEBUG_WIC="${DEBUG_WIC:-$PROJECT_ROOT/poc/raspi4b/rpi4-pl011-debug.wic}"
 TRACE_EVENTS="${TRACE_EVENTS:-$PROJECT_ROOT/pl011-rx-events}"
 TRACE_LOG="${TRACE_LOG:-$PROJECT_ROOT/qemu-pl011-trace.log}"

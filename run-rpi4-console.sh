@@ -11,10 +11,14 @@ done
 
 KERNEL="${KERNEL:-$(find_single_artifact 'Image-raspberrypi4-64.bin')}"
 DTB="${DTB:-$(find_single_artifact 'bcm2711-rpi-4-b-qemu-console.dtb')}"
-SOURCE_WIC="${WIC:-$(find_single_artifact 'core-image-base-raspberrypi4-64*.wic')}"
+SOURCE_WIC="${WIC:-$(find_single_artifact 'core-image-base-qemu-rpi4-raspberrypi4-64*.wic')}"
 CONSOLE_WIC="${CONSOLE_WIC:-$PROJECT_ROOT/poc/raspi4b/rpi4-console.wic}"
 CONSOLE_TTY="${CONSOLE_TTY:-ttyAMA0}"
-KERNEL_APPEND="${KERNEL_APPEND:-earlycon=pl011,mmio32,0xfe201000 console=$CONSOLE_TTY,115200 root=/dev/mmcblk1p2 rootwait rw init=/bin/sh}"
+DEFAULT_KERNEL_APPEND="earlycon=pl011,mmio32,0xfe201000 console=$CONSOLE_TTY,115200 root=/dev/mmcblk1p2 rootwait rw"
+if [[ "${DIRECT_SHELL:-0}" == "1" ]]; then
+    DEFAULT_KERNEL_APPEND+=" init=/bin/sh"
+fi
+KERNEL_APPEND="${KERNEL_APPEND:-$DEFAULT_KERNEL_APPEND}"
 [[ -f "$DTB" ]] || die "DTB를 찾을 수 없습니다: $DTB"
 
 if [[ ! -f "$CONSOLE_WIC" || "${RESET_WIC:-0}" == "1" ]]; then

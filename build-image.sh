@@ -42,7 +42,7 @@ EOF
 echo "===== Yocto build configuration ====="
 bitbake-layers show-layers
 echo "===== Building core-image-base ====="
-bitbake core-image-base
+bitbake core-image-base core-image-base-qemu-rpi4
 
 echo "===== Build artifacts ====="
 find "$DEPLOY_DIR" -maxdepth 1 \

@@ -145,6 +145,22 @@ Yocto 커널 recipe는 원본 DTB를 유지하면서 PL011을
 이 QEMU 전용 산출물을 사용한다. QEMU PL011 trace에서 PTY 입력, RX FIFO
 적재, IRQ assert, Linux FIFO read와 셸 명령 실행까지 확인했다.
 
+`core-image-base-qemu-rpi4`는 실물 보드 이미지를 유지하면서 별도 QEMU
+WIC를 생성한다. 빌드 결과는
+`core-image-base-qemu-rpi4-raspberrypi4-64.rootfs.wic`이다.
+`/boot`는 장치 번호 대신 WIC가 생성한 UUID로 마운트하므로
+QEMU의 `/dev/mmcblk1`에서도 systemd가 local filesystem 단계에 실패하지
+않는다. 실행 스크립트는 systemd와 직렬 root autologin을 기본으로 사용한다.
+초기화 과정을 건너뛰고 PID 1 셸로 직접 들어가려면 다음처럼 실행한다.
+
+```bash
+DIRECT_SHELL=1 RESET_WIC=1 ./run-rpi4-console.sh
+```
+
+QEMU systemd 부팅에서 `/boot`의 `/dev/mmcblk1p1` 마운트,
+`systemctl is-system-running`의 `running`, `ttyAMA0` root 자동 로그인을
+확인했다.
+
 RX 경로를 다시 검증하려면 다음을 실행한다. `INPUT_EOL=cr` 또는
 `INPUT_EOL=lf`로 입력 종단 문자를 각각 확인할 수 있고, 결과는
 `qemu-pl011-trace.log`, `qemu-rpi4-debug.log`,
