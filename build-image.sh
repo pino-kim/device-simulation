@@ -26,13 +26,17 @@ BB_NUMBER_THREADS = "${BB_NUMBER_THREADS:-$(nproc)}"
 PARALLEL_MAKE = "-j ${PARALLEL_MAKE_JOBS:-$(nproc)}"
 DL_DIR = "$PROJECT_ROOT/downloads"
 SSTATE_DIR = "$PROJECT_ROOT/sstate-cache"
+BB_HASHSERVE_DB_DIR = "$PROJECT_ROOT/sstate-cache"
 
 # Keep an uncompressed image for QEMU and a compressed image for distribution.
 IMAGE_FSTYPES = "wic wic.bz2"
 
-# PoC login automation. Remove debug-tweaks for production images.
-EXTRA_IMAGE_FEATURES += "debug-tweaks"
+# Test-only serial root login. Remove these features for production images.
+EXTRA_IMAGE_FEATURES += "allow-empty-password empty-root-password allow-root-login serial-autologin-root"
 SERIAL_CONSOLES = "115200;ttyAMA0"
+
+# Required by the Raspberry Pi BCM43456 Wi-Fi firmware package.
+LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
 EOF
 
 echo "===== Yocto build configuration ====="

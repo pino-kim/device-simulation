@@ -4,7 +4,7 @@
 set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/scripts/common.sh"
 
-for command in python3 sudo losetup lsblk mountpoint; do
+for command in python3 sfdisk dd debugfs; do
     require_command "$command"
 done
 [[ -x "$QEMU_BIN" ]] || die "먼저 ./build-qemu.sh를 실행하십시오."
@@ -17,15 +17,23 @@ TEST_DIR="$PROJECT_ROOT/poc/raspi4b/testfiles"
 TEST_WIC="$PROJECT_ROOT/poc/raspi4b/rpi4b-test.wic"
 RESULT="$PROJECT_ROOT/poc/raspi4b/result.txt"
 LOG="$PROJECT_ROOT/poc/raspi4b/t3-boot.log"
-MOUNT_DIR="$(mktemp -d)"
-LOOP_DEVICE=""
+ROOTFS_IMAGE="$(mktemp)"
 
 cleanup() {
-    if mountpoint -q "$MOUNT_DIR"; then sudo umount "$MOUNT_DIR"; fi
-    if [[ -n "$LOOP_DEVICE" ]]; then sudo losetup --detach "$LOOP_DEVICE"; fi
-    rmdir "$MOUNT_DIR"
+    rm -f "$ROOTFS_IMAGE"
 }
 trap cleanup EXIT
+
+read -r ROOT_START ROOT_SIZE < <(
+    sfdisk --json "$SOURCE_WIC" |
+        python3 -c '
+import json, sys
+parts = json.load(sys.stdin)["partitiontable"]["partitions"]
+if len(parts) < 2:
+    raise SystemExit("WIC의 두 번째 파티션을 찾을 수 없습니다.")
+print(parts[1]["start"], parts[1]["size"])
+'
+)
 
 echo "[1/4] 테스트용 SD 이미지 준비"
 cp --reflink=auto "$SOURCE_WIC" "$TEST_WIC"
@@ -35,18 +43,23 @@ while (( power < size )); do power=$((power * 2)); done
 truncate -s "$power" "$TEST_WIC"
 
 echo "[2/4] rootfs 파티션에 테스트 파일 주입"
-LOOP_DEVICE="$(sudo losetup --find --show --partscan "$TEST_WIC")"
-ROOT_PARTITION="$(lsblk -lnpo NAME,TYPE "$LOOP_DEVICE" |
-    awk '$2 == "part" {parts[++count]=$1} END {if (count >= 2) print parts[2]}')"
-[[ -n "$ROOT_PARTITION" ]] || die "WIC의 두 번째 파티션을 찾을 수 없습니다."
-sudo mount "$ROOT_PARTITION" "$MOUNT_DIR"
-sudo install -d "$MOUNT_DIR/home/root/hosttest"
-sudo cp -a "$TEST_DIR/." "$MOUNT_DIR/home/root/hosttest/"
-sudo chmod +x "$MOUNT_DIR/home/root/hosttest/run-tests.sh"
-sudo rm -f "$MOUNT_DIR/home/root/hosttest/result.txt"
-sudo umount "$MOUNT_DIR"
-sudo losetup --detach "$LOOP_DEVICE"
-LOOP_DEVICE=""
+dd if="$TEST_WIC" of="$ROOTFS_IMAGE" bs=512 skip="$ROOT_START" \
+    count="$ROOT_SIZE" status=none
+debugfs -w -R "mkdir /root/hosttest" "$ROOTFS_IMAGE" >/dev/null 2>&1 || true
+for test_file in "$TEST_DIR"/*; do
+    [[ -f "$test_file" ]] || continue
+    guest_file="/root/hosttest/$(basename "$test_file")"
+    debugfs -w -R "rm $guest_file" "$ROOTFS_IMAGE" >/dev/null 2>&1 || true
+    debugfs -w -R "write $test_file $guest_file" "$ROOTFS_IMAGE" >/dev/null
+done
+debugfs -w -R "set_inode_field /root/hosttest/run-tests.sh mode 0100755" \
+    "$ROOTFS_IMAGE" >/dev/null
+debugfs -w -R "set_inode_field /root/hosttest/codex-init.sh mode 0100755" \
+    "$ROOTFS_IMAGE" >/dev/null
+debugfs -w -R "rm /root/hosttest/result.txt" \
+    "$ROOTFS_IMAGE" >/dev/null 2>&1 || true
+dd if="$ROOTFS_IMAGE" of="$TEST_WIC" bs=512 seek="$ROOT_START" \
+    conv=notrunc status=none
 
 echo "[3/4] raspi4b 부팅 및 게스트 테스트"
 python3 "$PROJECT_ROOT/scripts/qemu_expect.py" \
@@ -54,15 +67,12 @@ python3 "$PROJECT_ROOT/scripts/qemu_expect.py" \
     --disk "$TEST_WIC" --log "$LOG"
 
 echo "[4/4] 테스트 결과 회수"
-LOOP_DEVICE="$(sudo losetup --find --show --partscan "$TEST_WIC")"
-ROOT_PARTITION="$(lsblk -lnpo NAME,TYPE "$LOOP_DEVICE" |
-    awk '$2 == "part" {parts[++count]=$1} END {if (count >= 2) print parts[2]}')"
-sudo mount "$ROOT_PARTITION" "$MOUNT_DIR"
-sudo cp "$MOUNT_DIR/home/root/hosttest/result.txt" "$RESULT"
-sudo chown "$(id -u):$(id -g)" "$RESULT"
-sudo umount "$MOUNT_DIR"
-sudo losetup --detach "$LOOP_DEVICE"
-LOOP_DEVICE=""
+dd if="$TEST_WIC" of="$ROOTFS_IMAGE" bs=512 skip="$ROOT_START" \
+    count="$ROOT_SIZE" status=none
+debugfs -R "dump /root/hosttest/result.txt $RESULT" \
+    "$ROOTFS_IMAGE" >/dev/null
 
 echo "===== T3 result ====="
 cat "$RESULT"
+grep -q '^PASS: T3 raspi4b 테스트 통과$' "$RESULT" ||
+    die "T3 게스트 테스트가 통과하지 못했습니다."

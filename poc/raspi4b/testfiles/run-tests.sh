@@ -10,9 +10,9 @@ echo "-- MMC/블록 디바이스 --"
 ls /dev/mmcblk* 2>/dev/null | tr '\n' ' '; echo
 test_rc=0
 
-if [ -x /home/root/hosttest/myapp ]; then
+if [ -x /root/hosttest/myapp ]; then
     echo "[myapp 실행]"
-    /home/root/hosttest/myapp --selftest
+    /root/hosttest/myapp --selftest
     test_rc=$?
     echo "myapp exit=$test_rc"
 else

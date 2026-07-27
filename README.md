@@ -22,18 +22,22 @@ QEMU `raspi4b`에 구현되지 않은 PCIe, GENET Ethernet, PWM과 실제 전기
 - Yocto Wrynose 6.0 LTS 호스트 패키지
 - QEMU 빌드 패키지
 - Python 3와 `pexpect`
-- T3 WIC 주입을 위한 `sudo`, loop device, mount 권한
+- T3 WIC 주입을 위한 `sfdisk`, `dd`, `debugfs`
 
 Ubuntu 패키지 예시:
 
 ```bash
 sudo apt-get install \
   build-essential chrpath cpio debianutils diffstat file gawk gcc git \
-  iputils-ping libacl1 libglib2.0-dev libpixman-1-dev libslirp-dev \
+  iputils-ping libacl1 libglib2.0-dev libpixman-1-dev \
   libsdl1.2-dev liblz4-tool locales python3 python3-git python3-jinja2 \
   python3-pexpect python3-pip python3-subunit socat texinfo unzip wget \
   xz-utils zstd lz4 ninja-build pkg-config
 ```
+
+`libslirp-dev`는 QEMU 사용자 모드 네트워크가 필요할 때만 선택적으로
+설치합니다. 이 저장소의 시리얼·디스크 기반 T1~T3 검증에는 필요하지
+않으며, 빌드 스크립트가 설치 여부를 자동 감지합니다.
 
 ## 전체 실행 순서
 
@@ -60,13 +64,13 @@ sudo apt-get install \
 
 ## 구성
 
-- `setup-yocto.sh`: 호환되는 Yocto 레이어를 `sources/`에 준비
+- `setup-yocto.sh`: 공식 6.0.2 릴리스 아카이브와 BSP 레이어를 `sources/`에 준비
 - `build-image.sh`: 호스트 BitBake 빌드 및 `conf/auto.conf` 생성
 - `meta-device-simulation/`: virtio/9p 커널 설정을 담은 커스텀 레이어
 - `build-qemu.sh`: QEMU stable을 `qemu-install/`에 설치
 - `run-t1-t2.sh`: `virt` 머신, 9p 공유 기반 테스트
-- `run-t3.sh`: `raspi4b` 머신, WIC 주입/회수 기반 테스트
-- `scripts/qemu_expect.py`: 부팅, 로그인, 테스트, 종료 자동화
+- `run-t3.sh`: `raspi4b` 머신, root 권한 없는 WIC 주입/회수 기반 테스트
+- `scripts/qemu_expect.py`: 부팅, 테스트, 종료 자동화
 - `poc/testshare/`: T1/T2 게스트 테스트 및 앱 배치 위치
 - `poc/raspi4b/testfiles/`: T3 게스트 테스트 및 앱 배치 위치
 
@@ -99,12 +103,18 @@ poc/raspi4b/t3-boot.log
 - `MACHINE = "raspberrypi4-64"`
 - `IMAGE_FSTYPES = "wic wic.bz2"`
 - T1/T2용 virtio-blk, PCI, 9p built-in
-- 자동 로그인을 위한 `debug-tweaks`
+- 자동 로그인을 위한 명시적 test-only root login image features
 - `ttyAMA0` serial console
 - 다운로드 및 sstate 캐시의 저장소 간 재사용
+- BCM43456 Wi-Fi firmware의 `synaptics-killswitch` 라이선스 명시적 수락
 
-`debug-tweaks`와 root 무비밀번호 로그인은 테스트 이미지에만 사용해야 하며
-프로덕션 이미지에서는 제거해야 한다.
+`allow-empty-password`, `empty-root-password`, `allow-root-login`,
+`serial-autologin-root`는 테스트 이미지에만 사용해야 하며 프로덕션
+이미지에서는 제거해야 한다.
+
+QEMU `raspi4b`에서는 DT의 UART 번호 배치에 맞춰 커널 명령행을
+`ttyAMA1`로 덮어쓰고, 테스트 전용 init이 결과를 WIC에 기록한 뒤
+종료한다. 따라서 T3는 `sudo`나 loop/mount 권한 없이 실행할 수 있다.
 
 환경 변수로 주요 경로와 병렬도를 변경할 수 있다.
 

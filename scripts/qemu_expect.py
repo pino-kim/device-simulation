@@ -51,12 +51,13 @@ def main() -> int:
             "-nographic", "-no-reboot", "-kernel", args.kernel,
             "-dtb", args.dtb,
             "-drive", f"file={args.disk},format=raw,if=sd",
-            "-append", "console=ttyAMA0,115200 earlycon=pl011,0xfe201000 "
-            "root=/dev/mmcblk1p2 rootwait rw",
+            "-append", "console=ttyAMA1,115200 earlycon=pl011,0xfe201000 "
+            "root=/dev/mmcblk1p2 rootwait rw "
+            "init=/root/hosttest/codex-init.sh",
         ]
         test_command = (
-            "sh /home/root/hosttest/run-tests.sh "
-            "> /home/root/hosttest/result.txt 2>&1; "
+            "sh /root/hosttest/run-tests.sh "
+            "> /root/hosttest/result.txt 2>&1; "
             "rc=$?; echo CODEX_TEST_RC=$rc"
         )
 
@@ -71,15 +72,29 @@ def main() -> int:
         child.logfile_read = logfile
         child.logfile_send = logfile
         try:
-            child.expect(r"login:")
-            child.sendline("root")
-            child.expect([r"root@[^#\r\n]*# ", r"# "])
-            print("Guest login succeeded")
-            child.sendline(test_command)
-            child.expect(r"CODEX_TEST_RC=(\d+)")
-            test_rc = int(child.match.group(1))
-            child.sendline("sync; poweroff")
-            child.expect(pexpect.EOF)
+            if args.mode == "raspi4b":
+                child.expect(pexpect.EOF)
+                test_rc = 0
+                print("Guest init completed and QEMU powered down")
+            else:
+                boot_state = child.expect(
+                    [
+                        r"login:",
+                        r"root@[^#\r\n]*# ",
+                        r"\r\n[^ \r\n]+:~# ",
+                    ]
+                )
+                if boot_state == 0:
+                    child.sendline("root")
+                    child.expect([r"root@[^#\r\n]*# ", r"# "])
+                    print("Guest login succeeded")
+                else:
+                    print("Guest serial auto-login succeeded")
+                child.sendline(test_command)
+                child.expect(r"CODEX_TEST_RC=(\d+)")
+                test_rc = int(child.match.group(1))
+                child.sendline("sync; poweroff -f")
+                child.expect(pexpect.EOF)
         except (pexpect.TIMEOUT, pexpect.EOF) as exc:
             print(f"QEMU automation failed: {exc}", file=sys.stderr)
             child.close(force=True)

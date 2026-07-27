@@ -25,7 +25,8 @@ require_command() {
 find_single_artifact() {
     local pattern="$1"
     local result
-    result="$(find "$DEPLOY_DIR" -maxdepth 1 -type f -name "$pattern" ! -type l | sort | tail -n 1)"
+    result="$(find "$DEPLOY_DIR" -maxdepth 1 \( -type f -o -type l \) \
+        -name "$pattern" | sort | tail -n 1)"
     [[ -n "$result" ]] || die "빌드 산출물을 찾을 수 없습니다: $DEPLOY_DIR/$pattern"
-    printf '%s\n' "$result"
+    readlink -f "$result"
 }
