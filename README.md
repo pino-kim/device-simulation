@@ -56,6 +56,9 @@ sudo apt-get install \
 
 # 5. BCM2711 T3 테스트
 ./run-t3.sh
+
+# Raspberry Pi 4 대화형 콘솔 접속
+./run-rpi4-console.sh
 ```
 
 최초 Yocto 빌드는 네트워크와 머신 성능에 따라 수십 분에서 수 시간이
@@ -70,6 +73,7 @@ sudo apt-get install \
 - `build-qemu.sh`: QEMU stable을 `qemu-install/`에 설치
 - `run-t1-t2.sh`: `virt` 머신, 9p 공유 기반 테스트
 - `run-t3.sh`: `raspi4b` 머신, root 권한 없는 WIC 주입/회수 기반 테스트
+- `run-rpi4-console.sh`: `raspi4b` 대화형 시리얼 콘솔 실행
 - `scripts/qemu_expect.py`: 부팅, 테스트, 종료 자동화
 - `poc/testshare/`: T1/T2 게스트 테스트 및 앱 배치 위치
 - `poc/raspi4b/testfiles/`: T3 게스트 테스트 및 앱 배치 위치
@@ -115,6 +119,14 @@ poc/raspi4b/t3-boot.log
 QEMU `raspi4b`에서는 DT의 UART 번호 배치에 맞춰 커널 명령행을
 `ttyAMA1`로 덮어쓰고, 테스트 전용 init이 결과를 WIC에 기록한 뒤
 종료한다. 따라서 T3는 `sudo`나 loop/mount 권한 없이 실행할 수 있다.
+
+대화형 콘솔은 `poc/raspi4b/rpi4-console.wic`을 계속 재사용하므로 게스트에서
+변경한 파일이 다음 부팅에도 유지된다. 원본 빌드 이미지로 초기화하려면 다음과
+같이 실행한다.
+
+```bash
+RESET_WIC=1 ./run-rpi4-console.sh
+```
 
 환경 변수로 주요 경로와 병렬도를 변경할 수 있다.
 
