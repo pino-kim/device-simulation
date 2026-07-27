@@ -7,16 +7,23 @@ echo "uname : $(uname -a)"
 echo "arch  : $(uname -m)"
 echo "distro: $(cat /etc/os-release 2>/dev/null | grep PRETTY | cut -d= -f2)"
 echo
+test_rc=0
 
 # --- 예시: 교체 대상 앱 바이너리 실행 지점 ---
 if [ -x /mnt/host/myapp ]; then
     echo "[myapp 실행]"
     /mnt/host/myapp --selftest
-    echo "myapp exit=$?"
+    test_rc=$?
+    echo "myapp exit=$test_rc"
 else
     echo "(myapp 없음 — testshare/에 바이너리를 두면 여기서 실행됩니다)"
 fi
 
 echo
-echo "PASS: 샘플 테스트 통과"
+if [ "$test_rc" -eq 0 ]; then
+    echo "PASS: 테스트 통과"
+else
+    echo "FAIL: myapp selftest 실패"
+fi
 echo "=== 게스트 자동테스트 종료 ==="
+exit "$test_rc"

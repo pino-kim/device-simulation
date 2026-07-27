@@ -5,6 +5,8 @@ qemu-install/
 qemu92-install/
 qemu-8.2.0/
 qemu-9.2.0/
+qemu-*/
+qemu-*-build/
 downloads/
 sstate-cache/
 
@@ -21,4 +23,8 @@ sstate-cache/
 poc/testshare/result.txt
 poc/raspi4b/result.txt
 poc/boot-full.log
+poc/t1-t2-boot.log
+poc/raspi4b/t3-boot.log
 qemu-Image
+__pycache__/
+*.pyc

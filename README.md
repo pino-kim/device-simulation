@@ -1,35 +1,115 @@
-# RPi4 Yocto 이미지 빌드 + QEMU 자동테스트 PoC
+# RPi4 Yocto 이미지 빌드 + QEMU 자동 테스트
 
-라즈베리파이4용 Yocto 이미지를 빌드하고, 실물 보드 없이 **QEMU로 보드 rootfs를 부팅해 앱 바이너리만 교체하며 자동테스트**하는 환경.
+Ubuntu 호스트에서 Raspberry Pi 4용 Yocto 이미지를 빌드하고, QEMU로 실물
+보드 없이 T1~T3 자동 테스트를 수행하는 프로젝트다. Docker는 사용하지 않는다.
+
+## 테스트 계층
+
+| 계층 | QEMU 머신 | 검증 범위 |
+|---|---|---|
+| T1 | `virt` | 앱, 라이브러리, 파일시스템, 유저스페이스 |
+| T2 | `virt` | 실제 Pi 커널의 syscall, virtio, 블록 등 범용 기능 |
+| T3 | `raspi4b` | BCM2711, Device Tree, MMC, GPIO 등 QEMU 구현 SoC 장치 |
+| T4 | 실물 보드 | 센서, 실제 GPIO 타이밍, 카메라, GPU, 물리 네트워크 |
+
+QEMU `raspi4b`에 구현되지 않은 PCIe, GENET Ethernet, PWM과 실제 전기적
+특성은 T3에서 검증할 수 없다.
+
+## 호스트 요구사항
+
+- Ubuntu 24.04 x86_64
+- 권장: CPU 8코어 이상, RAM 16GiB 이상, 여유 디스크 150GiB 이상
+- Yocto Wrynose 6.0 LTS 호스트 패키지
+- QEMU 빌드 패키지
+- Python 3와 `pexpect`
+- T3 WIC 주입을 위한 `sudo`, loop device, mount 권한
+
+Ubuntu 패키지 예시:
+
+```bash
+sudo apt-get install \
+  build-essential chrpath cpio debianutils diffstat file gawk gcc git \
+  iputils-ping libacl1 libglib2.0-dev libpixman-1-dev libslirp-dev \
+  libsdl1.2-dev liblz4-tool locales python3 python3-git python3-jinja2 \
+  python3-pexpect python3-pip python3-subunit socat texinfo unzip wget \
+  xz-utils zstd lz4 ninja-build pkg-config
+```
+
+## 전체 실행 순서
+
+```bash
+# 1. Poky 6.0.2 + meta-raspberrypi wrynose 준비
+./setup-yocto.sh
+
+# 2. Pi4 core-image-base 빌드
+./build-image.sh
+
+# 3. stable QEMU 11.0.2 빌드
+./build-qemu.sh
+
+# 4. 범용 T1/T2 테스트
+./run-t1-t2.sh
+
+# 5. BCM2711 T3 테스트
+./run-t3.sh
+```
+
+최초 Yocto 빌드는 네트워크와 머신 성능에 따라 수십 분에서 수 시간이
+걸린다. 다운로드와 sstate 캐시는 각각 `downloads/`, `sstate-cache/`에
+보존된다.
 
 ## 구성
-- `run-build.sh` — Yocto(kirkstone) core-image-base 빌드 (crops/yocto 컨테이너 내부에서 실행)
-- `build-qemu.sh` — qemu 8.2 소스 빌드 (컨테이너, root)
-- `build-qemu92.sh` — qemu 9.2 빌드. **raspi4b(BCM2711) 머신 포함** → T3(SoC 레벨 커널 테스트)용. slirp 포함
-- `build-kernel-virtio.sh` — 커널에 virtio/9p built-in 추가해 재빌드
-- `kernel-overlay/` — 커널 config 프래그먼트(virtio.cfg) + bbappend. 빌드 시 `sources/meta-raspberrypi/recipes-kernel/linux/`에 배치됨
-- `poc/` — 자동테스트 PoC
-  - `run-poc.sh` — 호스트에서 실행. QEMU 부팅 → 9p 마운트 → 테스트 → result.txt 회수 → 종료
-  - `drive.expect` — 부팅/로그인/마운트/실행/종료 자동화
-  - `testshare/run-tests.sh` — 게스트에서 실행되는 테스트(여기서 앱 바이너리 호출)
-  - `raspi4b/` — **T3 하니스**(BCM2711 SoC). raspi4b엔 9p가 없어 SD rootfs에 바이너리 주입 → 부팅·실행 → 결과 회수. `run-poc-raspi4b.sh`, `drive.expect`, `testfiles/`
 
-## 사용 (바이너리만 교체해 테스트)
+- `setup-yocto.sh`: 호환되는 Yocto 레이어를 `sources/`에 준비
+- `build-image.sh`: 호스트 BitBake 빌드 및 `conf/auto.conf` 생성
+- `meta-device-simulation/`: virtio/9p 커널 설정을 담은 커스텀 레이어
+- `build-qemu.sh`: QEMU stable을 `qemu-install/`에 설치
+- `run-t1-t2.sh`: `virt` 머신, 9p 공유 기반 테스트
+- `run-t3.sh`: `raspi4b` 머신, WIC 주입/회수 기반 테스트
+- `scripts/qemu_expect.py`: 부팅, 로그인, 테스트, 종료 자동화
+- `poc/testshare/`: T1/T2 게스트 테스트 및 앱 배치 위치
+- `poc/raspi4b/testfiles/`: T3 게스트 테스트 및 앱 배치 위치
+
+## 앱 바이너리 테스트
+
+바이너리는 ARM64이며 `--selftest`를 지원한다고 가정한다.
+
+```bash
+cp /path/to/myapp poc/testshare/myapp
+./run-t1-t2.sh
+
+cp /path/to/myapp poc/raspi4b/testfiles/myapp
+./run-t3.sh
 ```
-cp <새 앱 바이너리> poc/testshare/myapp
-bash poc/run-poc.sh
-# → poc/testshare/result.txt 로 결과 회수
+
+테스트 스크립트는 `myapp` 종료 코드를 호스트까지 전달한다. 결과와 전체
+시리얼 로그는 다음 위치에 생성된다.
+
+```text
+poc/testshare/result.txt
+poc/t1-t2-boot.log
+poc/raspi4b/result.txt
+poc/raspi4b/t3-boot.log
 ```
 
-## 핵심 제약/우회 (이 호스트: Ubuntu16.04/Py3.5/Docker1.13/qemu2.5)
-1. 빌드는 crops/yocto 컨테이너 + `--security-opt seccomp=unconfined` 필수
-2. mainline qemu엔 raspi4b 없음 → qemu 8.2 직접 빌드, `-M virt -cpu cortex-a72`로 부팅
-3. 커널에 virtio 활성화(kernel-overlay) 필요 — 아니면 rootfs 마운트 불가
-4. qemu(slirp 미포함) → 네트워크 대신 9p로 파일 교환
-5. 이미지 inittab에 ttyAMA0 시리얼 getty 추가 필요(프로덕션은 SERIAL_CONSOLES)
+## 빌드 설정
 
-## 한계
-QEMU virt는 CPU/범용장치만 에뮬 → GPIO·카메라·GPU·센서 등 Pi 고유 HW 의존 테스트는 실물 보드 필요. 앱 로직/유저스페이스/파일시스템 회귀는 이 환경으로 커버.
+`build-image.sh`는 `build/conf/auto.conf`를 매번 생성한다.
 
-## 재현 상세
-대용량(sources/, build/, qemu-install/, *.wic 등)은 git 제외. 전체 진행 순서는 Jira BSP-17 코멘트 참고.
+- `MACHINE = "raspberrypi4-64"`
+- `IMAGE_FSTYPES = "wic wic.bz2"`
+- T1/T2용 virtio-blk, PCI, 9p built-in
+- 자동 로그인을 위한 `debug-tweaks`
+- `ttyAMA0` serial console
+- 다운로드 및 sstate 캐시의 저장소 간 재사용
+
+`debug-tweaks`와 root 무비밀번호 로그인은 테스트 이미지에만 사용해야 하며
+프로덕션 이미지에서는 제거해야 한다.
+
+환경 변수로 주요 경로와 병렬도를 변경할 수 있다.
+
+```bash
+BB_NUMBER_THREADS=16 PARALLEL_MAKE_JOBS=16 ./build-image.sh
+QEMU_BUILD_JOBS=16 ./build-qemu.sh
+KERNEL=/path/to/Image WIC=/path/to/image.wic ./run-t1-t2.sh
+```
