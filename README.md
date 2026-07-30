@@ -21,6 +21,65 @@ bash poc/run-poc.sh
 # → poc/testshare/result.txt 로 결과 회수
 ```
 
+## Yocto 최초 빌드
+
+### 준비된 구성
+
+- 호스트: x86_64 Linux, Docker
+- 컨테이너: `crops/yocto:ubuntu-22.04-base`
+- Yocto: kirkstone (`poky`, `meta-raspberrypi`, `meta-openembedded`)
+- 타깃: `MACHINE = "raspberrypi4-64"`
+- 이미지: `core-image-base`
+
+소스 커밋은 `bootstrap-yocto.sh`에 고정돼 있다. 대용량 소스와 빌드
+산출물은 Git에 포함하지 않는다.
+
+### 1. 소스 준비
+
+```
+./bootstrap-yocto.sh
+```
+
+다음 저장소를 `sources/` 아래에 내려받는다.
+
+- `https://git.yoctoproject.org/poky`
+- `https://github.com/agherzan/meta-raspberrypi.git`
+- `https://git.openembedded.org/meta-openembedded`
+
+### 2. 이미지 빌드
+
+```
+./build-yocto.sh
+```
+
+현재 프로젝트를 컨테이너의 `/workdir`에 연결하고 `run-build.sh`를
+실행한다. `meta-device-simulation/` 레이어가 다음 설정을 적용한다.
+
+- QEMU `virt` 부팅용 virtio block/PCI
+- 호스트 파일 공유용 virtio 9p
+- `ttyAMA0` 시리얼 getty
+- PoC용 root 무비밀번호 로그인
+- `wic.bz2`, `wic.gz` 이미지 생성
+
+주요 산출물:
+
+```
+build/tmp/deploy/images/raspberrypi4-64/
+├── Image-raspberrypi4-64.bin
+├── bcm2711-rpi-4-b.dtb
+├── core-image-base-raspberrypi4-64.wic.bz2
+└── core-image-base-raspberrypi4-64.wic.gz
+```
+
+### 3. QEMU용 디스크 준비
+
+```
+./prepare-image.sh
+```
+
+압축된 WIC를 프로젝트 루트의 `rpi4.wic`으로 푼다. 이 파일은 QEMU
+하니스가 사용하는 쓰기 가능한 작업 이미지이며 Git에서 제외된다.
+
 ## 핵심 제약/우회 (이 호스트: Ubuntu16.04/Py3.5/Docker1.13/qemu2.5)
 1. 빌드는 crops/yocto 컨테이너 + `--security-opt seccomp=unconfined` 필수
 2. mainline qemu엔 raspi4b 없음 → qemu 8.2 직접 빌드, `-M virt -cpu cortex-a72`로 부팅

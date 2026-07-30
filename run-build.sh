@@ -18,16 +18,22 @@ source sources/poky/oe-init-build-env build
 
 echo "=== [2/4] 레이어 추가 ==="
 bitbake-layers add-layer ../sources/meta-raspberrypi || echo "(meta-raspberrypi 이미 추가됨)"
+bitbake-layers add-layer ../meta-device-simulation || echo "(meta-device-simulation 이미 추가됨)"
 
 echo "=== [3/4] local.conf 설정 (MACHINE=raspberrypi4-64) ==="
-if ! grep -q '^MACHINE = "raspberrypi4-64"' conf/local.conf; then
+if ! grep -q '^# ---- RPi4 QEMU build settings' conf/local.conf; then
   cat >> conf/local.conf <<'EOF'
 
-# ---- RPi4 build settings (added by run-build.sh) ----
+# ---- RPi4 QEMU build settings (added by run-build.sh) ----
 MACHINE = "raspberrypi4-64"
 BB_NUMBER_THREADS = "16"
 PARALLEL_MAKE = "-j 16"
-# .wic.bz2 형태의 SD카드 이미지 생성
+# QEMU/expect 자동 로그인을 위한 PL011 시리얼 콘솔
+ENABLE_UART = "1"
+SERIAL_CONSOLES = "115200;ttyAMA0"
+# 개발용 PoC: root 무비밀번호 로그인 허용
+EXTRA_IMAGE_FEATURES += "debug-tweaks"
+# SD 카드 이미지 생성
 IMAGE_FSTYPES = "wic.bz2 wic.gz"
 EOF
 fi
