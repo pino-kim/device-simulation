@@ -19,6 +19,8 @@ if [[ "${DIRECT_SHELL:-0}" == "1" ]]; then
     DEFAULT_KERNEL_APPEND+=" init=/bin/sh"
 fi
 KERNEL_APPEND="${KERNEL_APPEND:-$DEFAULT_KERNEL_APPEND}"
+RPI4_NET_MODE="${RPI4_NET_MODE:-none}"
+RPI4_NET_SOCKET="${RPI4_NET_SOCKET:-listen=:12345}"
 [[ -f "$DTB" ]] || die "DTB를 찾을 수 없습니다: $DTB"
 
 if [[ ! -f "$CONSOLE_WIC" || "${RESET_WIC:-0}" == "1" ]]; then
@@ -41,6 +43,20 @@ echo "screen 종료: Ctrl+A, \\"
 [[ -t 0 ]] || die "대화형 터미널에서 실행해야 합니다."
 QEMU_LOG="$(mktemp)"
 QEMU_PID=""
+QEMU_NET_ARGS=()
+case "$RPI4_NET_MODE" in
+    none)
+        ;;
+    user)
+        QEMU_NET_ARGS=(-nic user)
+        ;;
+    socket)
+        QEMU_NET_ARGS=(-nic "socket,$RPI4_NET_SOCKET")
+        ;;
+    *)
+        die "RPI4_NET_MODE은 none, user, socket 중 하나여야 합니다."
+        ;;
+esac
 cleanup() {
     if [[ -n "$QEMU_PID" ]] && kill -0 "$QEMU_PID" 2>/dev/null; then
         kill "$QEMU_PID" 2>/dev/null || true
@@ -63,6 +79,7 @@ trap cleanup EXIT INT TERM
     -dtb "$DTB" \
     -drive "file=$CONSOLE_WIC,format=raw,if=sd" \
     -append "$KERNEL_APPEND" \
+    "${QEMU_NET_ARGS[@]}" \
     > >(tee "$QEMU_LOG" >&2) 2>&1 &
 QEMU_PID=$!
 

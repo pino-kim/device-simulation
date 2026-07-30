@@ -12,8 +12,27 @@ Ubuntu 호스트에서 Raspberry Pi 4용 Yocto 이미지를 빌드하고, QEMU�
 | T3 | `raspi4b` | BCM2711, Device Tree, MMC, GPIO 등 QEMU 구현 SoC 장치 |
 | T4 | 실물 보드 | 센서, 실제 GPIO 타이밍, 카메라, GPU, 물리 네트워크 |
 
-QEMU `raspi4b`에 구현되지 않은 PCIe, GENET Ethernet, PWM과 실제 전기적
-특성은 T3에서 검증할 수 없다.
+Upstream QEMU `raspi4b`에 구현되지 않은 PCIe, GENET Ethernet, PWM과 실제
+전기적 특성은 기본 T3에서 검증할 수 없다.
+
+이 저장소는 QEMU 이슈 #2547의 v6 WIP에서 PCIe와 GENET 부분을 QEMU
+11.0.2에 시험 이식하는 패치를 포함한다. upstream 정식 기능은 아니므로
+기본 콘솔 실행에서는 네트워크 백엔드를 만들지 않는다. 패치된 GENET에
+소켓 백엔드를 연결하려면 다음처럼 실행한다.
+
+```bash
+RPI4_NET_MODE=socket RESET_WIC=1 ./run-rpi4-console.sh
+```
+
+다른 QEMU 또는 소켓 peer는 `RPI4_NET_SOCKET`으로 주소를 변경해 연결할 수
+있다. QEMU가 slirp 지원으로 빌드된 호스트에서는 외부 네트워크 시험에
+`RPI4_NET_MODE=user`를 사용할 수 있다.
+
+PCIe host bridge와 GENET `eth0` probe만 자동 확인하려면 다음을 실행한다.
+
+```bash
+./test-rpi4-network.sh
+```
 
 ## 호스트 요구사항
 
