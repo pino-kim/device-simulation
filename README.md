@@ -80,6 +80,42 @@ build/tmp/deploy/images/raspberrypi4-64/
 압축된 WIC를 프로젝트 루트의 `rpi4.wic`으로 푼다. 이 파일은 QEMU
 하니스가 사용하는 쓰기 가능한 작업 이미지이며 Git에서 제외된다.
 
+## QEMU 8.2 빌드와 virt 부팅
+
+QEMU는 `qemu-runner:latest` 이미지에 포함되지 않는다. 기존 빌드
+스크립트를 crops 컨테이너에서 실행해 프로젝트의 `qemu-install/`에
+설치한다.
+
+```
+docker run --rm --user 0 --security-opt seccomp=unconfined \
+  -v "$PWD":/workdir -w /workdir \
+  crops/yocto:ubuntu-22.04-base \
+  bash /workdir/build-qemu.sh
+```
+
+빌드 결과와 `virt` 머신 지원은 다음과 같이 확인한다.
+
+```
+docker run --rm --security-opt seccomp=unconfined \
+  -v "$PWD":/workdir qemu-runner:latest \
+  /workdir/qemu-install/bin/qemu-system-aarch64 --version
+
+docker run --rm --security-opt seccomp=unconfined \
+  -v "$PWD":/workdir qemu-runner:latest \
+  /workdir/qemu-install/bin/qemu-system-aarch64 -machine help
+```
+
+`rpi4.wic`까지 준비한 뒤 기존 자동화 하니스를 실행한다.
+
+```
+bash poc/run-poc.sh
+```
+
+실제 QEMU 명령은 `poc/drive.expect`에 있으며 `-M virt`,
+`-cpu cortex-a72`, virtio block, virtio 9p를 사용한다. 성공하면
+로그에 `RESULT_OK`가 출력되고 게스트 테스트 결과가
+`poc/testshare/result.txt`로 회수된다.
+
 ## 핵심 제약/우회 (이 호스트: Ubuntu16.04/Py3.5/Docker1.13/qemu2.5)
 1. 빌드는 crops/yocto 컨테이너 + `--security-opt seccomp=unconfined` 필수
 2. mainline qemu엔 raspi4b 없음 → qemu 8.2 직접 빌드, `-M virt -cpu cortex-a72`로 부팅

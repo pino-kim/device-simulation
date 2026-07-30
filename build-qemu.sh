@@ -1,5 +1,5 @@
 #!/bin/bash
-# crops 컨테이너(Ubuntu 22.04) 내부에서 root로 실행 — raspi4b 지원 qemu 8.2 빌드
+# crops 컨테이너(Ubuntu 22.04) 내부에서 root로 실행 — virt 머신용 QEMU 8.2 빌드
 set -e
 exec > >(tee -a /workdir/qemu-build.log) 2>&1
 echo "===== QEMU BUILD START ($(date)) ====="
@@ -32,7 +32,7 @@ make -j16
 echo "=== [5/5] install ==="
 make install
 
-echo "=== 완료: raspi4b 지원 확인 ==="
+echo "=== 완료: 버전 및 virt 머신 지원 확인 ==="
 /workdir/qemu-install/bin/qemu-system-aarch64 --version | head -1
-/workdir/qemu-install/bin/qemu-system-aarch64 -machine help | grep -i raspi || echo "(raspi 머신 없음!)"
+/workdir/qemu-install/bin/qemu-system-aarch64 -machine help | grep -E '^virt( |-)'
 echo "===== QEMU BUILD DONE ($(date)) ====="
