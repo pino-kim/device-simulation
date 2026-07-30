@@ -31,19 +31,42 @@ if [[ ! -d "$SOURCE" ]]; then
     tar -C "$PROJECT_ROOT" -xf "$ARCHIVE"
 fi
 
-RASPI4_NET_PATCH="$PROJECT_ROOT/qemu-patches/0001-raspi4b-pcie-genet-wip-v6-qemu-11.patch"
-if [[ -f "$RASPI4_NET_PATCH" ]]; then
-    if patch --batch --forward --dry-run --silent -d "$SOURCE" -p1 \
-        < "$RASPI4_NET_PATCH"; then
-        echo "Raspberry Pi 4 PCIe/GENET 시험 패치를 적용합니다."
+RASPI4_NET_PATCH_DIR="$PROJECT_ROOT/qemu-patches/20260725-rpi4-pcie-genet"
+RASPI4_NET_PATCH_STAMP="$SOURCE/.device-simulation-patchew-20260725"
+RASPI4_NET_LOCAL_STAMP="$SOURCE/.device-simulation-genet-dma-status-v1"
+shopt -s nullglob
+RASPI4_NET_PATCHES=("$RASPI4_NET_PATCH_DIR"/*.patch)
+shopt -u nullglob
+[[ ${#RASPI4_NET_PATCHES[@]} -eq 20 ]] ||
+    die "PCIe/GENET 패치 20개를 찾을 수 없습니다: $RASPI4_NET_PATCH_DIR"
+
+if [[ -f "$RASPI4_NET_PATCH_STAMP" ]]; then
+    echo "Patchew Raspberry Pi 4 PCIe/GENET 패치가 이미 적용되어 있습니다."
+else
+    for raspi4_net_patch in "${RASPI4_NET_PATCHES[@]:0:19}"; do
+        if ! patch --batch --forward --dry-run --silent -d "$SOURCE" -p1 \
+            < "$raspi4_net_patch"; then
+            die "Patchew 패치를 QEMU $QEMU_VERSION 소스에 적용할 수 없습니다: $(basename "$raspi4_net_patch")"
+        fi
+        echo "적용: $(basename "$raspi4_net_patch")"
         patch --batch --forward --silent -d "$SOURCE" -p1 \
-            < "$RASPI4_NET_PATCH"
-    elif patch --batch --dry-run --silent --reverse -d "$SOURCE" -p1 \
-        < "$RASPI4_NET_PATCH"; then
-        echo "Raspberry Pi 4 PCIe/GENET 시험 패치가 이미 적용되어 있습니다."
-    else
-        die "PCIe/GENET 패치를 QEMU $QEMU_VERSION 소스에 적용할 수 없습니다."
+            < "$raspi4_net_patch"
+    done
+    touch "$RASPI4_NET_PATCH_STAMP"
+fi
+
+if [[ -f "$RASPI4_NET_LOCAL_STAMP" ]]; then
+    echo "GENET DMA 상태 호환성 패치가 이미 적용되어 있습니다."
+else
+    raspi4_net_patch="${RASPI4_NET_PATCHES[19]}"
+    if ! patch --batch --forward --dry-run --silent -d "$SOURCE" -p1 \
+        < "$raspi4_net_patch"; then
+        die "GENET DMA 상태 패치를 적용할 수 없습니다: $(basename "$raspi4_net_patch")"
     fi
+    echo "적용: $(basename "$raspi4_net_patch")"
+    patch --batch --forward --silent -d "$SOURCE" -p1 \
+        < "$raspi4_net_patch"
+    touch "$RASPI4_NET_LOCAL_STAMP"
 fi
 
 mkdir -p "$BUILD"

@@ -1,0 +1,162 @@
+From 10e05db8a825497071ee427165936bf58dc30a7a Mon Sep 17 00:00:00 2001
+From: Sergey Kambalin <serg.oker@gmail.com>
+Date: Fri, 24 Jul 2026 20:42:04 -0400
+Subject: [PATCH 05/19] hw/net/bcm2838_genet: add GENET register structs, part
+ 1/4
+
+Add the SYS, GR_BRIDGE, EXT, INTRL0, and INTRL1 register block
+layouts and the top-level BCM2838GenetRegs/BCM2838GenetState
+structs, plus REG32/FIELD accessors for the revision-control and
+interrupt-status registers.
+
+Part of Sergey Kambalin's original Raspberry Pi 4B PCIe/GENET
+networking series (patchwork series 829638, posted to qemu-devel in
+2024, never merged). Carried forward and completed by Marcelo Manzo.
+
+Signed-off-by: Sergey Kambalin <sergey.kambalin@auriga.com>
+Signed-off-by: Marcelo Manzo <marcelomanzo@gmail.com>
+---
+ hw/net/bcm2838_genet.c         | 37 ++++++++++++++++
+ include/hw/net/bcm2838_genet.h | 77 +++++++++++++++++++++++++++++++++-
+ 2 files changed, 113 insertions(+), 1 deletion(-)
+
+diff --git a/hw/net/bcm2838_genet.c b/hw/net/bcm2838_genet.c
+index 2ff93a3..ff6602c 100644
+--- a/hw/net/bcm2838_genet.c
++++ b/hw/net/bcm2838_genet.c
+@@ -15,10 +15,47 @@
+ #include "hw/core/irq.h"
+ #include "net/checksum.h"
+ #include "system/dma.h"
++#include "hw/core/registerfields.h"
+ #include "hw/core/resettable.h"
+ #include "hw/net/bcm2838_genet.h"
+ #include "trace.h"
+ 
++REG32(GENET_SYS_REV_CTRL,              0)
++FIELD(GENET_SYS_REV_CTRL, GPHY_REV,    0, 16)
++FIELD(GENET_SYS_REV_CTRL, MINOR_REV,   16, 4)
++FIELD(GENET_SYS_REV_CTRL, RSVD_20_23,  20, 4)
++FIELD(GENET_SYS_REV_CTRL, MAJOR_REV,   24, 4)
++FIELD(GENET_SYS_REV_CTRL, RSVD_28_31,  28, 4)
++
++REG32(GENET_INTRL_0,                0)
++FIELD(GENET_INTRL_0, SCB,           0, 1)
++FIELD(GENET_INTRL_0, EPHY,          1, 1)
++FIELD(GENET_INTRL_0, PHY_DET_R,     2, 1)
++FIELD(GENET_INTRL_0, PHY_DET_F,     3, 1)
++FIELD(GENET_INTRL_0, LINK_UP,       4, 1)
++FIELD(GENET_INTRL_0, LINK_DOWN,     5, 1)
++FIELD(GENET_INTRL_0, UMAC,          6, 1)
++FIELD(GENET_INTRL_0, UMAC_TSV,      7, 1)
++FIELD(GENET_INTRL_0, TBUF_UNDERRUN, 8, 1)
++FIELD(GENET_INTRL_0, RBUF_OVERFLOW, 9, 1)
++FIELD(GENET_INTRL_0, HFB_SM,        10, 1)
++FIELD(GENET_INTRL_0, HFB_MM,        11, 1)
++FIELD(GENET_INTRL_0, MPD_R,         12, 1)
++FIELD(GENET_INTRL_0, RXDMA_MBDONE,  13, 1)
++FIELD(GENET_INTRL_0, RXDMA_PDONE,   14, 1)
++FIELD(GENET_INTRL_0, RXDMA_BDONE,   15, 1)
++FIELD(GENET_INTRL_0, TXDMA_MBDONE,  16, 1)
++FIELD(GENET_INTRL_0, TXDMA_PDONE,   17, 1)
++FIELD(GENET_INTRL_0, TXDMA_BDONE,   18, 1)
++FIELD(GENET_INTRL_0, RSVD_19_22,    19, 4)
++FIELD(GENET_INTRL_0, MDIO_DONE,     23, 1)
++FIELD(GENET_INTRL_0, MDIO_ERROR,    24, 1)
++FIELD(GENET_INTRL_0, RSVD_25_31,    25, 4)
++
++REG32(GENET_INTRL_1,              0)
++FIELD(GENET_INTRL_1, TX_INTRS,    0, 16)
++FIELD(GENET_INTRL_1, RX_INTRS,    16, 16)
++
+ 
+ static uint64_t bcm2838_genet_read(void *opaque, hwaddr offset, unsigned size)
+ {
+diff --git a/include/hw/net/bcm2838_genet.h b/include/hw/net/bcm2838_genet.h
+index 91cf177..af5e8ab 100644
+--- a/include/hw/net/bcm2838_genet.h
++++ b/include/hw/net/bcm2838_genet.h
+@@ -19,7 +19,82 @@ OBJECT_DECLARE_SIMPLE_TYPE(BCM2838GenetState, BCM2838_GENET)
+ #define BCM2838_GENET_REV_MINOR         0
+ 
+ typedef struct {
+-    uint8_t stub_area[0x10000]; /* temporary stub */
++    uint32_t rev_ctrl;
++    uint32_t port_ctrl;
++    uint32_t rbuf_flush_ctrl;
++    uint32_t tbuf_flush_ctrl;
++    uint32_t reserved_0x10[12];
++} BCM2838GenetRegsSys;
++
++typedef struct {
++    uint32_t reserved_0x0[16];
++} BCM2838GenetRegsGrBridge;
++
++typedef struct {
++    uint32_t pwr_mgmt;
++    uint32_t reserved_0x4[2];
++    uint32_t rgmii_oob_ctrl;
++    uint32_t reserved_0x10[3];
++    uint32_t gphy_ctrl;
++    uint32_t reserved_0x20[24];
++} BCM2838GenetRegsExt;
++
++typedef struct {
++    uint32_t stat;
++    uint32_t set;
++    uint32_t clear;
++    uint32_t mask_status;
++    uint32_t mask_set;
++    uint32_t mask_clear;
++    uint32_t reserved_0x18[10];
++} BCM2838GenetRegsIntrl0;
++
++typedef struct {
++    uint32_t stat;
++    uint32_t set;
++    uint32_t clear;
++    uint32_t mask_status;
++    uint32_t mask_set;
++    uint32_t mask_clear;
++    uint32_t reserved_0x18[10];
++} BCM2838GenetRegsIntrl1;
++
++typedef struct {
++    uint32_t ctrl;
++    uint32_t reserved_0x4[2];
++    uint32_t status;
++    uint32_t reserved_0x10;
++    uint32_t chk_ctrl;
++    uint32_t reserved_0x18[31];
++    uint32_t ovfl_cnt;
++    uint32_t err_cnt;
++    uint32_t energy_ctrl;
++    uint32_t reserved_0xA0[5];
++    uint32_t size_ctrl;
++    uint32_t reserved_0xB8[18];
++} BCM2838GenetRegsRbuf;
++
++typedef struct {
++    uint32_t ctrl;
++    uint32_t reserved_0x4[2];
++    uint32_t bp_mc;
++    uint32_t reserved_0x10;
++    uint32_t energy_ctrl;
++    uint32_t reserved_0x18[58];
++} BCM2838GenetRegsTbuf;
++
++typedef struct {
++    BCM2838GenetRegsSys sys;
++    BCM2838GenetRegsGrBridge gr_bridge;
++    BCM2838GenetRegsExt ext;
++    uint32_t reserved_0x100[64];
++    BCM2838GenetRegsIntrl0 intrl0;
++    BCM2838GenetRegsIntrl1 intrl1;
++    uint32_t reserved_0x280[32];
++    BCM2838GenetRegsRbuf rbuf;
++    uint32_t reserved_0x400[128];
++    BCM2838GenetRegsTbuf tbuf;
++    uint32_t reserved_0x700[64];
+ } BCM2838GenetRegs;
+ 
+ struct BCM2838GenetState {

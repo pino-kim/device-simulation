@@ -15,8 +15,9 @@ Ubuntu 호스트에서 Raspberry Pi 4용 Yocto 이미지를 빌드하고, QEMU�
 Upstream QEMU `raspi4b`에 구현되지 않은 PCIe, GENET Ethernet, PWM과 실제
 전기적 특성은 기본 T3에서 검증할 수 없다.
 
-이 저장소는 QEMU 이슈 #2547의 v6 WIP에서 PCIe와 GENET 부분을 QEMU
-11.0.2에 시험 이식하는 패치를 포함한다. upstream 정식 기능은 아니므로
+이 저장소는 2026-07-25에 게시된 Patchew PCIe/GENET 19개 패치와
+Yocto Wrynose 커널용 DMA 상태 호환성 패치를 QEMU 11.0.2에 적용한다.
+아직 upstream 정식 기능은 아니므로
 기본 콘솔 실행에서는 네트워크 백엔드를 만들지 않는다. 패치된 GENET에
 소켓 백엔드를 연결하려면 다음처럼 실행한다.
 
@@ -32,6 +33,25 @@ PCIe host bridge와 GENET `eth0` probe만 자동 확인하려면 다음을 실�
 
 ```bash
 ./test-rpi4-network.sh
+```
+
+Host와 Guest 사이의 양방향 ping 시험은 전용 TAP을 생성한다. 스크립트는
+기존 인터페이스가 있으면 덮어쓰지 않고 중단하며, 종료 시 자신이 생성한
+TAP만 삭제한다. 현재 패치로 Link Up과 TX descriptor 회수까지 성공하지만
+TAP 수신 callback이 발생하지 않아 ping은 실패 상태로 보고된다.
+
+```bash
+./test-rpi4-tap-ping.sh
+```
+
+기본 주소는 Host `192.168.76.1/24`, Guest `192.168.76.2/24`이다. 변경이
+필요하면 sudo 뒤에 환경 변수를 전달한다.
+
+```bash
+sudo TAP_IF=rpi4tap1 \
+  HOST_CIDR=192.168.77.1/24 \
+  GUEST_CIDR=192.168.77.2/24 \
+  ./test-rpi4-tap-ping.sh
 ```
 
 ## 호스트 요구사항

@@ -1,0 +1,32 @@
+From 22922f80bc7063e4d429b1424f3614d44b9dfa77 Mon Sep 17 00:00:00 2001
+From: Marcelo Manzo <marcelomanzo@gmail.com>
+Date: Fri, 24 Jul 2026 20:42:17 -0400
+Subject: [PATCH 18/19] docs/system/arm/raspi: move PCIe/GENET from missing to
+ implemented
+
+raspi4b now has a working PCIe Root Complex and GENET Ethernet
+controller (added in the preceding patches); move them out of the
+"Missing devices" list and into "Implemented devices".
+
+Signed-off-by: Marcelo Manzo <marcelomanzo@gmail.com>
+---
+ docs/system/arm/raspi.rst | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/docs/system/arm/raspi.rst b/docs/system/arm/raspi.rst
+index 44eec3f..a4f83d0 100644
+--- a/docs/system/arm/raspi.rst
++++ b/docs/system/arm/raspi.rst
+@@ -36,10 +36,10 @@ Implemented devices
+  * VideoCore firmware (property)
+  * Peripheral SPI controller (SPI)
+  * Broadcom Serial Controller (I2C)
++ * PCIe Root Complex (raspi4b)
++ * GENET Ethernet Controller (raspi4b)
+ 
+ Missing devices
+ ---------------
+ 
+  * Pulse Width Modulation (PWM)
+- * PCIE Root Port (raspi4b)
+- * GENET Ethernet Controller (raspi4b)

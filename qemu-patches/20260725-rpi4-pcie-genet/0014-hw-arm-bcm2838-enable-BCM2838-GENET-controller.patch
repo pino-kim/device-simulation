@@ -1,0 +1,102 @@
+From 3be46498907742c3449e120e45cadfacb7ec8c96 Mon Sep 17 00:00:00 2001
+From: Marcelo Manzo <marcelomanzo@gmail.com>
+Date: Fri, 24 Jul 2026 20:42:13 -0400
+Subject: [PATCH 14/19] hw/arm/bcm2838: enable BCM2838 GENET controller
+
+Wire the BCM2838 GENET device (added in the previous patches) into
+the SoC: instantiate it in the peripherals block with
+qemu_configure_nic_device() so it picks up a -nic/-netdev from the
+command line, map its register region at the real BCM2711 physical
+offset, and route its two interrupt lines through the GIC. Also stop
+raspi4b from masking out the "brcm,bcm2711-genet-v5" device-tree
+node, now that the controller it describes is actually implemented.
+
+Adapted from patches 19-29/41 of Sergey Kambalin's Raspberry Pi 4B
+series (patchwork series 829638) against current QEMU master.
+
+Signed-off-by: Marcelo Manzo <marcelomanzo@gmail.com>
+---
+ hw/arm/bcm2838.c                     |  6 ++++++
+ hw/arm/bcm2838_peripherals.c         | 11 +++++++++++
+ hw/arm/raspi4b.c                     |  1 -
+ include/hw/arm/bcm2838_peripherals.h |  2 ++
+ 4 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/hw/arm/bcm2838.c b/hw/arm/bcm2838.c
+index 9046aab..9ec570b 100644
+--- a/hw/arm/bcm2838.c
++++ b/hw/arm/bcm2838.c
+@@ -235,6 +235,12 @@ static void bcm2838_realize(DeviceState *dev, Error **errp)
+                                       int_n);
+     }
+ 
++    /* Connect Gigabit Ethernet controller to the interrupt controller */
++    sysbus_connect_irq(SYS_BUS_DEVICE(&ps->genet), 0,
++                       qdev_get_gpio_in(gicdev, GIC_SPI_INTERRUPT_GENET_A));
++    sysbus_connect_irq(SYS_BUS_DEVICE(&ps->genet), 1,
++                       qdev_get_gpio_in(gicdev, GIC_SPI_INTERRUPT_GENET_B));
++
+     /* Pass through inbound GPIO lines to the GIC */
+     qdev_init_gpio_in(dev, bcm2838_gic_set_irq, GIC_NUM_IRQS);
+ 
+diff --git a/hw/arm/bcm2838_peripherals.c b/hw/arm/bcm2838_peripherals.c
+index f71937a..de49f48 100644
+--- a/hw/arm/bcm2838_peripherals.c
++++ b/hw/arm/bcm2838_peripherals.c
+@@ -44,6 +44,10 @@ static void bcm2838_peripherals_init(Object *obj)
+     object_initialize_child(obj, "pcie-host", &s->pcie_host,
+                             TYPE_BCM2838_PCIE_HOST);
+ 
++    /* Gigabit Ethernet */
++    object_initialize_child(obj, "genet", &s->genet, TYPE_BCM2838_GENET);
++    qemu_configure_nic_device(DEVICE(&s->genet), true, NULL);
++
+     /* GPIO */
+     object_initialize_child(obj, "gpio", &s->gpio, TYPE_BCM2838_GPIO);
+ 
+@@ -205,6 +209,13 @@ static void bcm2838_peripherals_realize(DeviceState *dev, Error **errp)
+     memory_region_add_subregion(get_system_memory(), PCIE_MMIO_ARM_OFFSET,
+                                 mmio_mr);
+ 
++    /* Gigabit Ethernet */
++    if (!sysbus_realize(SYS_BUS_DEVICE(&s->genet), errp)) {
++        return;
++    }
++    regs_mr = sysbus_mmio_get_region(SYS_BUS_DEVICE(&s->genet), 0);
++    memory_region_add_subregion(&s->peri_low_mr, GENET_OFFSET, regs_mr);
++
+     /* GPIO */
+     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp)) {
+         return;
+diff --git a/hw/arm/raspi4b.c b/hw/arm/raspi4b.c
+index 30d33bd..16185dc 100644
+--- a/hw/arm/raspi4b.c
++++ b/hw/arm/raspi4b.c
+@@ -66,7 +66,6 @@ static void raspi4_modify_dtb(const struct arm_boot_info *info, void *fdt)
+     const char *nodes_to_remove[] = {
+         "brcm,bcm2711-rng200",
+         "brcm,bcm2711-thermal",
+-        "brcm,bcm2711-genet-v5",
+     };
+ 
+     for (int i = 0; i < ARRAY_SIZE(nodes_to_remove); i++) {
+diff --git a/include/hw/arm/bcm2838_peripherals.h b/include/hw/arm/bcm2838_peripherals.h
+index 7abece4..9f8a749 100644
+--- a/include/hw/arm/bcm2838_peripherals.h
++++ b/include/hw/arm/bcm2838_peripherals.h
+@@ -11,6 +11,7 @@
+ 
+ #include "hw/arm/bcm2835_peripherals.h"
+ #include "hw/arm/bcm2838_pcie.h"
++#include "hw/net/bcm2838_genet.h"
+ #include "hw/sd/sdhci.h"
+ #include "hw/gpio/bcm2838_gpio.h"
+ 
+@@ -68,6 +69,7 @@ struct BCM2838PeripheralState {
+ 
+     SDHCIState emmc2;
+     BCM2838PcieHostState pcie_host;
++    BCM2838GenetState genet;
+     BCM2838GpioState gpio;
+ 
+     OrIRQState mmc_irq_orgate;
