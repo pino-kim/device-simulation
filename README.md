@@ -17,7 +17,12 @@ Upstream QEMU `raspi4b`에 구현되지 않은 PCIe, GENET Ethernet, PWM과 실�
 
 이 저장소는 2026-07-25에 게시된 Patchew PCIe/GENET 19개 패치와
 프로젝트 로컬 호환성·PCIe 보정 패치 4개를 QEMU 11.0.2에 적용한다.
-아직 upstream 정식 기능은 아니므로
+아직 upstream 정식 기능은 아니다.
+
+## 네트워크 테스트
+
+### GENET 콘솔 및 장치 확인
+
 기본 콘솔 실행에서는 네트워크 백엔드를 만들지 않는다. 패치된 GENET에
 소켓 백엔드를 연결하려면 다음처럼 실행한다.
 
@@ -29,11 +34,13 @@ RPI4_NET_MODE=socket RESET_WIC=1 ./run-rpi4-console.sh
 있다. QEMU가 slirp 지원으로 빌드된 호스트에서는 외부 네트워크 시험에
 `RPI4_NET_MODE=user`를 사용할 수 있다.
 
-PCIe host bridge와 GENET `eth0` probe만 자동 확인하려면 다음을 실행한다.
+PCIe host bridge와 GENET probe만 자동 확인하려면 다음을 실행한다.
 
 ```bash
 ./test-rpi4-network.sh
 ```
+
+### GENET TAP 시험
 
 Host와 Guest 사이의 양방향 ping 시험은 전용 TAP을 생성한다. 스크립트는
 기존 인터페이스가 있으면 덮어쓰지 않고 중단하며, 종료 시 자신이 생성한
@@ -43,6 +50,18 @@ TAP 수신 callback이 발생하지 않아 ping은 실패 상태로 보고된다
 ```bash
 ./test-rpi4-tap-ping.sh
 ```
+
+기본 주소는 Host `192.168.76.1/24`, Guest `192.168.76.2/24`이다. 변경이
+필요하면 sudo 뒤에 환경 변수를 전달한다.
+
+```bash
+sudo TAP_IF=rpi4tap1 \
+  HOST_CIDR=192.168.77.1/24 \
+  GUEST_CIDR=192.168.77.2/24 \
+  ./test-rpi4-tap-ping.sh
+```
+
+### PCIe virtio-net TAP 시험
 
 PCIe root port 아래에 `virtio-net-pci` endpoint를 연결하는 시험은 다음과
 같다. 이 경로는 PCIe config-space, bridge MMIO window, virtio BAR 접근과
@@ -55,15 +74,9 @@ Host↔Guest 양방향 ping까지 검증한다.
 기본 주소는 Host `192.168.78.1/24`, Guest `192.168.78.2/24`이고 PCIe
 virtio 장치는 Guest의 `eth0`, GENET은 `eth1`로 등록된다.
 
-기본 주소는 Host `192.168.76.1/24`, Guest `192.168.76.2/24`이다. 변경이
-필요하면 sudo 뒤에 환경 변수를 전달한다.
-
-```bash
-sudo TAP_IF=rpi4tap1 \
-  HOST_CIDR=192.168.77.1/24 \
-  GUEST_CIDR=192.168.77.2/24 \
-  ./test-rpi4-tap-ping.sh
-```
+성공 시 Guest→Host와 Host→Guest ping 결과가 모두 출력되고 마지막에
+`PASS`가 표시된다. TAP 생성에는 root 권한이 필요하며, 일반 사용자로
+실행하면 스크립트가 `sudo`로 다시 실행한다.
 
 ## 호스트 요구사항
 
