@@ -78,6 +78,85 @@ virtio 장치는 Guest의 `eth0`, GENET은 `eth1`로 등록된다.
 `PASS`가 표시된다. TAP 생성에는 root 권한이 필요하며, 일반 사용자로
 실행하면 스크립트가 `sudo`로 다시 실행한다.
 
+## PCIe USB/xHCI 테스트
+
+### 구현 범위
+
+현재 QEMU `raspi4b`에는 실물 Raspberry Pi 4의 PCIe VL805 USB
+컨트롤러가 모델링되어 있지 않다. 대신 패치된 BCM2711 PCIe root port
+`pcie.1`에 QEMU 범용 `qemu-xhci` endpoint를 연결하여 PCIe enumeration,
+BAR 접근, xHCI 초기화와 USB 장치 연결 경로를 검증할 수 있다.
+
+```bash
+-device qemu-xhci,bus=pcie.1,id=xhci,msi=off,msix=off
+```
+
+이 구성에서 Guest가 xHCI controller와
+`Host supports USB 3.0 SuperSpeed`를 인식하고, QEMU 가상 USB 키보드가
+HID 장치로 등록되는 것을 확인했다. 이는 범용 xHCI 컨트롤러의 USB 3
+지원 확인이며, 아래에서 시험한 물리 장치 자체는 USB 2.0 High-Speed
+장치이므로 물리 USB 3 전송 속도를 검증한 결과는 아니다.
+
+Raspberry Pi 3B에는 PCIe와 USB 3 컨트롤러가 없고 DWC2 USB 2 경로만
+있으므로 이 `qemu-xhci` PCIe 구성은 적용할 수 없다.
+
+### 물리 USB 장치 전달
+
+QEMU 빌드 요약에 `libusb: YES`가 표시되고 장치 목록에 `usb-host`가
+있어야 한다.
+
+```bash
+pkg-config --modversion libusb-1.0
+./build-qemu.sh
+qemu-install/bin/qemu-system-aarch64 -device help | grep usb-host
+```
+
+USB 메모리는 Host 파일시스템에서 먼저 안전하게 unmount하고, QEMU가
+인터페이스를 점유할 수 있도록 Host의 `usb-storage` 드라이버에서
+unbind한다. 아래의 bus/device 번호와 `1-9:1.0` 경로는 `lsusb`,
+`lsusb -t`, `readlink /sys/bus/usb/devices/*` 결과에 맞게 변경해야 한다.
+
+```bash
+sudo umount /dev/sda1
+echo '1-9:1.0' | sudo tee /sys/bus/usb/drivers/usb-storage/unbind
+sudo setfacl -m "u:$USER:rw" /dev/bus/usb/001/022
+getfacl /dev/bus/usb/001/022
+```
+
+QEMU에는 xHCI controller 다음에 물리 장치를 vendor/product ID로
+연결한다. 같은 ID의 장치가 여러 개라면 `hostbus`와 `hostaddr`를
+사용하여 정확한 장치를 지정한다.
+
+```bash
+-device qemu-xhci,bus=pcie.1,id=xhci,msi=off,msix=off \
+-device usb-host,bus=xhci.0,vendorid=0x0781,productid=0x5567
+```
+
+SanDisk Cruzer Blade `0781:5567` 시험에서는 Guest가 USB mass-storage,
+SCSI 디스크, `/dev/sda`와 `/dev/sda1`을 차례로 생성했다. `/dev/sda1`을
+읽기 전용으로 마운트해 파일 접근까지 확인했으며 물리 장치에는 쓰지
+않았다.
+
+```bash
+mkdir -p /tmp/host-usb
+mount -o ro /dev/sda1 /tmp/host-usb
+ls -laR /tmp/host-usb
+umount /tmp/host-usb
+```
+
+Qualcomm `05c6:9501` vendor-specific 장치도 Guest enumeration까지
+확인했다. 다만 bulk endpoint의 maxpacket 경고가 발생했으며 실제
+프로토콜 통신은 검증하지 않았다. 상위 `05c6:9500` USB hub와 하위 장치를
+동시에 전달하지 않고 필요한 하위 장치만 지정했다.
+
+QEMU가 종료되면 일반적으로 Host의 `usb-storage` 드라이버가 다시
+연결된다. 다음 명령으로 장치와 파티션이 복구됐는지 반드시 확인한다.
+
+```bash
+lsusb
+lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS
+```
+
 ## 호스트 요구사항
 
 - Ubuntu 24.04 x86_64
@@ -91,11 +170,11 @@ Ubuntu 패키지 예시:
 
 ```bash
 sudo apt-get install \
-  build-essential chrpath cpio debianutils diffstat file gawk gcc git \
-  iputils-ping libacl1 libglib2.0-dev libpixman-1-dev \
+  acl build-essential chrpath cpio debianutils diffstat file gawk gcc git \
+  iputils-ping libacl1 libglib2.0-dev libpixman-1-dev libusb-1.0-0-dev \
   libsdl1.2-dev liblz4-tool locales python3 python3-git python3-jinja2 \
   python3-pexpect python3-pip python3-subunit socat texinfo unzip wget \
-  xz-utils zstd lz4 ninja-build pkg-config
+  usbutils xz-utils zstd lz4 ninja-build pkg-config
 ```
 
 `libslirp-dev`는 QEMU 사용자 모드 네트워크가 필요할 때만 선택적으로
