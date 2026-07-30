@@ -37,11 +37,12 @@ RASPI4_NET_LOCAL_STAMP="$SOURCE/.device-simulation-genet-dma-status-v1"
 RASPI4_PCIE_CFG_STAMP="$SOURCE/.device-simulation-pcie-config-v1"
 RASPI4_PCIE_MMIO_STAMP="$SOURCE/.device-simulation-pcie-mmio-v1"
 RASPI4_PCIE_HOOKS_STAMP="$SOURCE/.device-simulation-pcie-config-hooks-v1"
+RASPI4_GENET_RX_STAMP="$SOURCE/.device-simulation-genet-rx-v1"
 shopt -s nullglob
 RASPI4_NET_PATCHES=("$RASPI4_NET_PATCH_DIR"/*.patch)
 shopt -u nullglob
-[[ ${#RASPI4_NET_PATCHES[@]} -eq 23 ]] ||
-    die "PCIe/GENET 패치 23개를 찾을 수 없습니다: $RASPI4_NET_PATCH_DIR"
+[[ ${#RASPI4_NET_PATCHES[@]} -eq 24 ]] ||
+    die "PCIe/GENET 패치 24개를 찾을 수 없습니다: $RASPI4_NET_PATCH_DIR"
 
 if [[ -f "$RASPI4_NET_PATCH_STAMP" ]]; then
     echo "Patchew Raspberry Pi 4 PCIe/GENET 패치가 이미 적용되어 있습니다."
@@ -112,6 +113,20 @@ else
     patch --batch --forward --silent -d "$SOURCE" -p1 \
         < "$raspi4_net_patch"
     touch "$RASPI4_NET_LOCAL_STAMP"
+fi
+
+if [[ -f "$RASPI4_GENET_RX_STAMP" ]]; then
+    echo "GENET 기본 RX ring 패치가 이미 적용되어 있습니다."
+else
+    raspi4_net_patch="${RASPI4_NET_PATCHES[23]}"
+    if ! patch --batch --forward --dry-run --silent -d "$SOURCE" -p1 \
+        < "$raspi4_net_patch"; then
+        die "GENET 기본 RX ring 패치를 적용할 수 없습니다: $(basename "$raspi4_net_patch")"
+    fi
+    echo "적용: $(basename "$raspi4_net_patch")"
+    patch --batch --forward --silent -d "$SOURCE" -p1 \
+        < "$raspi4_net_patch"
+    touch "$RASPI4_GENET_RX_STAMP"
 fi
 
 mkdir -p "$BUILD"

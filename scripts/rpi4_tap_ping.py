@@ -58,6 +58,9 @@ def main() -> int:
             "-trace", "enable=bcm2838_genet_tx_request",
             "-trace", "enable=bcm2838_genet_tx",
             "-trace", "enable=bcm2838_genet_receive",
+            "-trace", "enable=bcm2838_genet_rx_dma_ring_active",
+            "-trace", "enable=bcm2838_genet_rx_dma",
+            "-trace", "enable=bcm2838_genet_irq",
             "-trace", "enable=bcm2838_genet_phy_update_link",
         ])
     else:
@@ -92,6 +95,9 @@ def main() -> int:
                 child.expect([r"root@[^#\r\n]*# ", r"# "])
 
             guest_command = (
+                f"ip link set {shlex.quote(args.guest_iface)} down && "
+                f"ip link set {shlex.quote(args.guest_iface)} address "
+                f"{shlex.quote(args.guest_mac)} && "
                 f"ip link set {shlex.quote(args.guest_iface)} up && "
                 f"ip addr flush dev {shlex.quote(args.guest_iface)} && "
                 f"ip addr add {shlex.quote(args.guest_cidr)} "
@@ -105,6 +111,13 @@ def main() -> int:
             guest_rc = int(child.match.group(1))
             if guest_rc:
                 print("Guest -> Host ping failed", file=sys.stderr)
+                child.sendline(
+                    f"for f in /sys/class/net/{shlex.quote(args.guest_iface)}"
+                    "/statistics/*; do echo $f=$(cat $f); done; "
+                    "cat /proc/interrupts; echo __CODEX_GENET_DIAG_DONE__"
+                )
+                child.expect(r"__CODEX_GENET_DIAG_DONE__")
+                child.expect(r"__CODEX_GENET_DIAG_DONE__")
 
             host_ping = subprocess.run(
                 ["ping", "-c", "3", "-W", "2", guest_ip],

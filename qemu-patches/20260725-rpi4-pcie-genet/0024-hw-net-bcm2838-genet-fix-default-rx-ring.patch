@@ -1,0 +1,96 @@
+From 2ef4aa767df87099342fc85745bf36c1657473ab Mon Sep 17 00:00:00 2001
+From: device-simulation <device-simulation@localhost>
+Date: Thu, 30 Jul 2026 18:00:00 +0900
+Subject: [PATCH 24/24] hw/net/bcm2838_genet: fix default RX ring
+
+Current Linux bcmgenet drivers configure logical RX queue 0 when the
+hardware advertises no priority RX queues. The emulation instead routed
+all packets without an HFB match to register ring 16, which remained
+disabled. The network backend callback consequently returned -1 without
+writing a descriptor.
+
+Route unfiltered traffic to ring 0 and connect the existing receive trace.
+Add RDMA and interrupt traces so descriptor DMA and IRQ delivery can be
+diagnosed without changing device behavior.
+
+Signed-off-by: device-simulation <device-simulation@localhost>
+---
+ hw/net/bcm2838_genet.c | 18 +++++++++++++++++-
+ hw/net/trace-events    |  2 ++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+
+--- a/hw/net/bcm2838_genet.c
++++ b/hw/net/bcm2838_genet.c
+@@ -268,6 +268,7 @@
+     uint32_t intrl_0_mask = s->regs.intrl0.mask_status;
+     int level = (intrl_0_status & ~intrl_0_mask) == 0 ? 0 : 1;
+ 
++    trace_bcm2838_genet_irq("default", intrl_0_status, intrl_0_mask, level);
+     qemu_set_irq(s->irq_default, level);
+ }
+ 
+@@ -277,6 +278,7 @@
+     uint32_t intrl_1_mask = s->regs.intrl1.mask_status;
+     int level = (intrl_1_status & ~intrl_1_mask) == 0 ? 0 : 1;
+ 
++    trace_bcm2838_genet_irq("priority", intrl_1_status, intrl_1_mask, level);
+     qemu_set_irq(s->irq_prio, level);
+ }
+ 
+@@ -877,9 +879,15 @@
+         xmit_status->rx_csum = 0;
+         xmit_status->length_status = desc->length_status;
+ 
++        prod_index = FIELD_EX32(ring->prod_index,
++                                GENET_DMA_PROD_INDEX, INDEX);
+         mem_tx_result = address_space_write(&s->dma_as, dma_buf_addr,
+                                             MEMTXATTRS_UNSPECIFIED,
+                                             dma_buf, buf_size);
++        trace_bcm2838_genet_rx_dma(ring_idx, write_index, prod_index,
++                                   FIELD_EX32(ring->cons_index,
++                                              GENET_DMA_CONS_INDEX, INDEX),
++                                   dma_buf_addr, buflength, mem_tx_result);
+         if (mem_tx_result != MEMTX_OK) {
+             desc->length_status = FIELD_DP32(desc->length_status,
+                                              GENET_RDMA_LENGTH_STATUS,
+@@ -891,7 +899,6 @@
+             break;
+         }
+ 
+-        prod_index = FIELD_EX32(ring->prod_index, GENET_DMA_PROD_INDEX, INDEX);
+         ring->prod_index = FIELD_DP32(ring->prod_index,
+                                       GENET_DMA_PROD_INDEX,
+                                       INDEX, ++prod_index);
+@@ -932,7 +939,13 @@
+         if (filter_index >= 0) {
+             ring_index = bcm2838_genet_filter2ring(s, filter_index);
+         } else {
+-            ring_index = BCM2838_GENET_DMA_RING_CNT - 1;
++            /*
++             * Linux configures logical RX queue 0 as the unfiltered
++             * default queue.  Ring 16 is present in the register layout,
++             * but is not enabled by current bcmgenet drivers when
++             * hw_params->rx_queues is zero.
++             */
++            ring_index = 0;
+         }
+ 
+         if (size <= MAX_PACKET_SIZE) {
+@@ -942,6 +955,7 @@
+ 
+     bcm2838_genet_set_irq_default(s);
+     bcm2838_genet_set_irq_prio(s);
++    trace_bcm2838_genet_receive(bytes_received);
+ 
+     return bytes_received;
+ }
+--- a/hw/net/trace-events
++++ b/hw/net/trace-events
+@@ -544,3 +544,5 @@
+ bcm2838_genet_tx_request(unsigned int ring_idx, uint32_t prod_idx, uint32_t cons_idx) "ring %u, PROD_INDEX %u, CONS_INDEX %u"
+ bcm2838_genet_tx(unsigned int ring_idx, uint64_t desc_idx, uint32_t desc_status, uint64_t data_addr) "ring %u, descriptor %" PRIu64 ": 0x%08x, data @ 0x%08" PRIx64
+ bcm2838_genet_rx_dma_ring_active(unsigned int ring, const char *ring_state) "ring %u is %s"
++bcm2838_genet_rx_dma(unsigned int ring, uint64_t desc_idx, uint32_t prod_idx, uint32_t cons_idx, uint64_t data_addr, size_t size, int result) "ring %u descriptor %" PRIu64 " prod %u cons %u data @ 0x%08" PRIx64 " size %zu result %d"
++bcm2838_genet_irq(const char *irq, uint32_t status, uint32_t mask, int level) "%s status 0x%08x mask 0x%08x level %d"
+-- 
+2.43.0
