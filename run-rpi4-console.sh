@@ -21,6 +21,7 @@ fi
 KERNEL_APPEND="${KERNEL_APPEND:-$DEFAULT_KERNEL_APPEND}"
 RPI4_NET_MODE="${RPI4_NET_MODE:-none}"
 RPI4_NET_SOCKET="${RPI4_NET_SOCKET:-listen=:12345}"
+RPI4_PCIE_DEVICE="${RPI4_PCIE_DEVICE:-none}"
 [[ -f "$DTB" ]] || die "DTB를 찾을 수 없습니다: $DTB"
 
 if [[ ! -f "$CONSOLE_WIC" || "${RESET_WIC:-0}" == "1" ]]; then
@@ -44,17 +45,39 @@ echo "screen 종료: Ctrl+A, \\"
 QEMU_LOG="$(mktemp)"
 QEMU_PID=""
 QEMU_NET_ARGS=()
-case "$RPI4_NET_MODE" in
+case "$RPI4_PCIE_DEVICE" in
     none)
+        case "$RPI4_NET_MODE" in
+            none) ;;
+            user) QEMU_NET_ARGS=(-nic user,model=bcm2838-genet) ;;
+            socket) QEMU_NET_ARGS=(-nic "socket,model=bcm2838-genet,$RPI4_NET_SOCKET") ;;
+            *) die "RPI4_NET_MODE은 none, user, socket 중 하나여야 합니다." ;;
+        esac
         ;;
-    user)
-        QEMU_NET_ARGS=(-nic user)
-        ;;
-    socket)
-        QEMU_NET_ARGS=(-nic "socket,$RPI4_NET_SOCKET")
+    virtio-net-pci)
+        case "$RPI4_NET_MODE" in
+            none)
+                QEMU_NET_ARGS=(
+                    -device virtio-net-pci,bus=pcie.1,disable-modern=off,disable-legacy=on,vectors=0
+                )
+                ;;
+            user)
+                QEMU_NET_ARGS=(
+                    -netdev user,id=pcienet0
+                    -device virtio-net-pci,bus=pcie.1,netdev=pcienet0,disable-modern=off,disable-legacy=on,vectors=0
+                )
+                ;;
+            socket)
+                QEMU_NET_ARGS=(
+                    -netdev "socket,id=pcienet0,$RPI4_NET_SOCKET"
+                    -device virtio-net-pci,bus=pcie.1,netdev=pcienet0,disable-modern=off,disable-legacy=on,vectors=0
+                )
+                ;;
+            *) die "RPI4_NET_MODE은 none, user, socket 중 하나여야 합니다." ;;
+        esac
         ;;
     *)
-        die "RPI4_NET_MODE은 none, user, socket 중 하나여야 합니다."
+        die "RPI4_PCIE_DEVICE는 none 또는 virtio-net-pci여야 합니다."
         ;;
 esac
 cleanup() {

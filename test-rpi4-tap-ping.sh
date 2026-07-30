@@ -8,6 +8,8 @@ TAP_IF="${TAP_IF:-rpi4tap0}"
 HOST_CIDR="${HOST_CIDR:-192.168.76.1/24}"
 GUEST_CIDR="${GUEST_CIDR:-192.168.76.2/24}"
 GUEST_MAC="${GUEST_MAC:-52:54:00:12:34:56}"
+RPI4_NET_DEVICE="${RPI4_NET_DEVICE:-genet}"
+GUEST_IFACE="${GUEST_IFACE:-eth0}"
 HOST_IP="${HOST_CIDR%/*}"
 GUEST_IP="${GUEST_CIDR%/*}"
 LOG="${LOG:-$PROJECT_ROOT/poc/raspi4b/tap-ping.log}"
@@ -76,5 +78,7 @@ python3 "$PROJECT_ROOT/scripts/rpi4_tap_ping.py" \
     --host-ip "$HOST_IP" \
     --guest-cidr "$GUEST_CIDR" \
     --guest-mac "$GUEST_MAC" \
+    --network-device "$RPI4_NET_DEVICE" \
+    --guest-iface "$GUEST_IFACE" \
     --log "$LOG" \
     --timeout "${BOOT_TIMEOUT:-120}"

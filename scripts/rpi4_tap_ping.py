@@ -22,6 +22,12 @@ def main() -> int:
     parser.add_argument("--host-ip", required=True)
     parser.add_argument("--guest-cidr", required=True)
     parser.add_argument("--guest-mac", required=True)
+    parser.add_argument(
+        "--network-device",
+        choices=("genet", "virtio-net-pci"),
+        default="genet",
+    )
+    parser.add_argument("--guest-iface", default="eth0")
     parser.add_argument("--log", required=True)
     parser.add_argument("--timeout", type=int, default=120)
     args = parser.parse_args()
@@ -43,14 +49,26 @@ def main() -> int:
         "-append",
         "earlycon=pl011,mmio32,0xfe201000 console=ttyAMA0,115200 "
         "root=/dev/mmcblk1p2 rootwait rw",
-        "-nic",
-        f"tap,model=bcm2838-genet,ifname={args.tap},script=no,"
-        f"downscript=no,mac={args.guest_mac}",
-        "-trace", "enable=bcm2838_genet_tx_request",
-        "-trace", "enable=bcm2838_genet_tx",
-        "-trace", "enable=bcm2838_genet_receive",
-        "-trace", "enable=bcm2838_genet_phy_update_link",
     ]
+    if args.network_device == "genet":
+        command.extend([
+            "-nic",
+            f"tap,model=bcm2838-genet,ifname={args.tap},script=no,"
+            f"downscript=no,mac={args.guest_mac}",
+            "-trace", "enable=bcm2838_genet_tx_request",
+            "-trace", "enable=bcm2838_genet_tx",
+            "-trace", "enable=bcm2838_genet_receive",
+            "-trace", "enable=bcm2838_genet_phy_update_link",
+        ])
+    else:
+        command.extend([
+            "-netdev",
+            f"tap,id=pcienet0,ifname={args.tap},script=no,downscript=no",
+            "-device",
+            f"virtio-net-pci,bus=pcie.1,netdev=pcienet0,"
+            f"mac={args.guest_mac},disable-modern=off,disable-legacy=on,"
+            "vectors=0",
+        ])
 
     print("QEMU command:", shlex.join(command))
     log_path = pathlib.Path(args.log)
@@ -74,9 +92,10 @@ def main() -> int:
                 child.expect([r"root@[^#\r\n]*# ", r"# "])
 
             guest_command = (
-                "ip link set eth0 up && "
-                "ip addr flush dev eth0 && "
-                f"ip addr add {shlex.quote(args.guest_cidr)} dev eth0 && "
+                f"ip link set {shlex.quote(args.guest_iface)} up && "
+                f"ip addr flush dev {shlex.quote(args.guest_iface)} && "
+                f"ip addr add {shlex.quote(args.guest_cidr)} "
+                f"dev {shlex.quote(args.guest_iface)} && "
                 "sleep 5 && "
                 f"ping -c 3 -W 2 {shlex.quote(args.host_ip)}; "
                 "rc=$?; echo CODEX_GUEST_PING_RC=$rc"

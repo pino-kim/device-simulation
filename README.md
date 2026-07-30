@@ -16,7 +16,7 @@ Upstream QEMU `raspi4b`에 구현되지 않은 PCIe, GENET Ethernet, PWM과 실�
 전기적 특성은 기본 T3에서 검증할 수 없다.
 
 이 저장소는 2026-07-25에 게시된 Patchew PCIe/GENET 19개 패치와
-Yocto Wrynose 커널용 DMA 상태 호환성 패치를 QEMU 11.0.2에 적용한다.
+프로젝트 로컬 호환성·PCIe 보정 패치 4개를 QEMU 11.0.2에 적용한다.
 아직 upstream 정식 기능은 아니므로
 기본 콘솔 실행에서는 네트워크 백엔드를 만들지 않는다. 패치된 GENET에
 소켓 백엔드를 연결하려면 다음처럼 실행한다.
@@ -43,6 +43,17 @@ TAP 수신 callback이 발생하지 않아 ping은 실패 상태로 보고된다
 ```bash
 ./test-rpi4-tap-ping.sh
 ```
+
+PCIe root port 아래에 `virtio-net-pci` endpoint를 연결하는 시험은 다음과
+같다. 이 경로는 PCIe config-space, bridge MMIO window, virtio BAR 접근과
+Host↔Guest 양방향 ping까지 검증한다.
+
+```bash
+./test-rpi4-pcie-network.sh
+```
+
+기본 주소는 Host `192.168.78.1/24`, Guest `192.168.78.2/24`이고 PCIe
+virtio 장치는 Guest의 `eth0`, GENET은 `eth1`로 등록된다.
 
 기본 주소는 Host `192.168.76.1/24`, Guest `192.168.76.2/24`이다. 변경이
 필요하면 sudo 뒤에 환경 변수를 전달한다.

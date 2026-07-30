@@ -1,0 +1,53 @@
+From: Codex <codex@local>
+Date: Thu, 30 Jul 2026 00:00:00 +0900
+Subject: [PATCH 22/22] hw/arm/bcm2838_pcie: translate downstream MMIO window
+
+The BCM2711 device tree maps PCI bus addresses 0xc0000000..0xffffffff
+to CPU addresses 0x600000000..0x63fffffff.  The model exposed the PCI
+memory container at CPU window offset zero, while PCI BAR regions were
+registered at their bus addresses.  Linux could enumerate an endpoint
+but hung when accessing its assigned BAR.
+
+Expose an alias of the PCI memory container starting at bus address
+0xc0000000 and limit it to the 1 GiB DT range.
+---
+ hw/arm/bcm2838_pcie.c         | 8 ++++----
+ include/hw/arm/bcm2838_pcie.h | 2 ++
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/hw/arm/bcm2838_pcie.c b/hw/arm/bcm2838_pcie.c
+--- a/hw/arm/bcm2838_pcie.c
++++ b/hw/arm/bcm2838_pcie.c
+@@ -177,9 +177,10 @@ static void bcm2838_pcie_host_realize(DeviceState *dev, Error **errp)
+     memory_region_init(&s->io_ioport, OBJECT(s), "bcm2838_pcie_ioport",
+                        64 * 1024);
+ 
+-    memory_region_init_io(&s->io_mmio_window, OBJECT(s),
+-                            &unassigned_io_ops, OBJECT(s),
+-                            "bcm2838_pcie_mmio_window", UINT64_MAX);
++    memory_region_init_alias(&s->io_mmio_window, OBJECT(s),
++                             "bcm2838_pcie_mmio_window", &s->io_mmio,
++                             BCM2838_PCIE_MMIO_OFFSET,
++                             BCM2838_PCIE_MMIO_SIZE);
+     memory_region_init_io(&s->io_ioport_window, OBJECT(s),
+                             &unassigned_io_ops, OBJECT(s),
+                             "bcm2838_pcie_ioport_window", 64 * 1024);
+@@ -187,4 +188,3 @@ static void bcm2838_pcie_host_realize(DeviceState *dev, Error **errp)
+-    memory_region_add_subregion(&s->io_mmio_window, 0, &s->io_mmio);
+     memory_region_add_subregion(&s->io_ioport_window, 0, &s->io_ioport);
+     sysbus_init_mmio(sbd, &s->io_mmio_window);
+     sysbus_init_mmio(sbd, &s->io_ioport_window);
+diff --git a/include/hw/arm/bcm2838_pcie.h b/include/hw/arm/bcm2838_pcie.h
+--- a/include/hw/arm/bcm2838_pcie.h
++++ b/include/hw/arm/bcm2838_pcie.h
+@@ -29,6 +29,8 @@ OBJECT_DECLARE_TYPE(BCM2838PcieRootState, BCM2838PcieRootClass,
+ 
+ #define BCM2838_PCIE_REGS_SIZE      0x9310
+ #define BCM2838_PCIE_NUM_IRQS       4
++#define BCM2838_PCIE_MMIO_OFFSET    0xc0000000
++#define BCM2838_PCIE_MMIO_SIZE      0x40000000
+ 
+ #define BCM2838_PCIE_EXP_CAP_OFFSET 0xAC
+ #define BCM2838_PCIE_AER_CAP_OFFSET 0x100
+-- 
+2.47.1
