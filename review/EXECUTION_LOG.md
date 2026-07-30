@@ -491,6 +491,51 @@ bash poc/run-poc.sh
 bash poc/raspi4b/run-poc-raspi4b.sh
 ```
 
+## 16. raspi4b 대화형 콘솔 접속
+
+기존 콘솔용 SD 이미지가 있으면 재사용한다.
+
+```bash
+bash poc/raspi4b/run-console.sh
+```
+
+원본 `rpi4.wic`에서 콘솔용 SD 이미지를 새로 만들고 접속한다.
+
+```bash
+bash poc/raspi4b/run-console.sh --fresh
+```
+
+로그인:
+
+```text
+raspberrypi4-64 login: root
+Password: 입력하지 않음
+```
+
+로그인 후 확인 예:
+
+```bash
+uname -a
+cat /proc/device-tree/model
+ls -l /dev/mmcblk*
+mount
+```
+
+정상 종료:
+
+```bash
+sync
+poweroff
+```
+
+QEMU 터미널 제어:
+
+```text
+Ctrl-a h  도움말
+Ctrl-a c  시리얼 콘솔/QEMU monitor 전환
+Ctrl-a x  QEMU 강제 종료
+```
+
 빈 작업 공간에서 전체를 재현할 때는 다음 순서를 사용한다.
 
 ```bash

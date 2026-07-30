@@ -126,5 +126,26 @@ bash poc/run-poc.sh
 ## 한계
 QEMU virt는 CPU/범용장치만 에뮬 → GPIO·카메라·GPU·센서 등 Pi 고유 HW 의존 테스트는 실물 보드 필요. 앱 로직/유저스페이스/파일시스템 회귀는 이 환경으로 커버.
 
+## raspi4b 대화형 콘솔
+
+QEMU 9.2와 `rpi4.wic`이 준비된 상태에서 다음 명령으로 Raspberry Pi
+4B 시리얼 콘솔에 직접 접속한다.
+
+```
+bash poc/raspi4b/run-console.sh
+```
+
+최초 실행 시 원본 `rpi4.wic`을 보존하고 전용 512MiB 이미지
+`poc/raspi4b/rpi4b-console.wic`을 생성한다. 이후 변경 사항은 이
+콘솔용 이미지에 유지된다. 원본에서 다시 시작하려면 다음을 사용한다.
+
+```
+bash poc/raspi4b/run-console.sh --fresh
+```
+
+로그인 계정은 `root`이며 비밀번호는 없다. 정상 종료는 root 셸에서
+`poweroff`를 실행한다. `Ctrl-a h`는 QEMU 키 도움말, `Ctrl-a c`는
+시리얼 콘솔과 QEMU monitor 전환, `Ctrl-a x`는 강제 종료다.
+
 ## 재현 상세
 대용량(sources/, build/, qemu-install/, *.wic 등)은 git 제외. 전체 진행 순서는 Jira BSP-17 코멘트 참고.

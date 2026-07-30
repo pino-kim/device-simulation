@@ -195,3 +195,35 @@ QEMU 9.2 `raspi4b` 머신을 이용한 BCM2711 수준 부팅, SD/MMC rootfs,
 이 PASS는 Raspberry Pi 4B 장치 트리와 SD/MMC 경로를 포함한 부팅
 smoke test 결과이며 실제 애플리케이션이나 모든 주변장치 기능의
 검증을 의미하지 않는다.
+
+## 11. 대화형 콘솔 검증
+
+`poc/raspi4b/run-console.sh --fresh`로 별도의 512MiB 콘솔용 SD
+이미지를 만들고 대화형 터미널에서 직접 로그인했다.
+
+```text
+raspberrypi4-64 login: root
+root@raspberrypi4-64:~#
+```
+
+로그인 후 실제 확인 결과:
+
+```text
+$ uname -m
+aarch64
+
+$ cat /proc/device-tree/model
+Raspberry Pi 4 Model B
+
+$ ls /dev/mmcblk*
+/dev/mmcblk1 /dev/mmcblk1p1 /dev/mmcblk1p2
+```
+
+root 셸에서 `poweroff`를 실행했으며 다음 로그와 QEMU 종료 코드 0을
+확인했다.
+
+```text
+EXT4-fs (mmcblk1p2): re-mounted
+kvm: exiting hardware virtualization
+reboot: Power down
+```
