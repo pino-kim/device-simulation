@@ -5,6 +5,9 @@
 `poc/testshare/myapp`이 없어서 실제 ARM64 애플리케이션과
 `myapp --selftest`는 실행하지 않았다.
 
+raspi4b 하니스에서도 `poc/raspi4b/testfiles/myapp`을 배치하지 않아
+실제 애플리케이션 테스트는 수행하지 않았다.
+
 현재 결과의 `PASS`는 QEMU 부팅, 로그인, 9p 마운트, 셸 테스트 및 결과
 회수가 성공했다는 의미다.
 
@@ -20,6 +23,9 @@ sh /mnt/host/run-tests.sh 2>&1 | tee /mnt/host/result.txt
 `run-tests.sh` 또는 `myapp`이 실패하더라도 마지막 `tee`가 성공하면
 파이프라인이 성공으로 보일 수 있다. Expect 역시 테스트 종료 코드가
 아니라 `TESTS_DONE` 문자열을 확인한다.
+
+raspi4b 하니스 역시 `myapp`이 없어도 PASS를 출력하고 실제 테스트
+종료 코드를 Expect까지 전달하지 않는다.
 
 CI 품질 게이트로 사용하려면 다음 개선이 필요하다.
 
