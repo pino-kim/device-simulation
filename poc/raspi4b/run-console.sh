@@ -8,7 +8,7 @@ KERNEL="${BASE}/build/tmp/deploy/images/raspberrypi4-64/Image-raspberrypi4-64.bi
 DTB="${BASE}/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b.dtb"
 SOURCE_WIC="${BASE}/rpi4.wic"
 CONSOLE_WIC="${BASE}/poc/raspi4b/rpi4b-console.wic"
-RUNNER=${QEMU_RUNNER_IMAGE:-qemu-runner:latest}
+RUNNER=${TEST_CONTAINER_IMAGE:-device-simulation-test:latest}
 FRESH=0
 
 usage() {
@@ -54,6 +54,11 @@ for required in "$QEMU" "$KERNEL" "$DTB" "$SOURCE_WIC"; do
         exit 1
     fi
 done
+
+if ! docker inspect "$RUNNER" >/dev/null 2>&1; then
+    echo "[준비] 테스트 러너 이미지 빌드 중..."
+    TEST_CONTAINER_IMAGE="$RUNNER" "$BASE/build-test-image.sh"
+fi
 
 if [ "$FRESH" -eq 1 ] || [ ! -f "$CONSOLE_WIC" ]; then
     echo "[준비] 콘솔용 SD 이미지 생성: $CONSOLE_WIC"

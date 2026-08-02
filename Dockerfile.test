@@ -1,0 +1,25 @@
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Runtime dependencies for the locally built QEMU binaries, plus the tools used
+# by the expect-based harness and the raspi4b filesystem injection flow.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        e2fsprogs \
+        expect \
+        libasound2 \
+        libglib2.0-0 \
+        libpixman-1-0 \
+        libpng16-16 \
+        libpulse0 \
+        libslirp0 \
+        util-linux \
+        zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workdir
+
+CMD ["bash"]

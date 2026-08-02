@@ -1,0 +1,18 @@
+# Docker 1.13 cannot consume current Ubuntu 22.04 image metadata. This local,
+# pre-bootstrapped Jammy runner is the compatibility base for the legacy host.
+FROM qemu-runner:latest
+
+USER root
+
+RUN command -v bash \
+    && command -v expect \
+    && command -v mount \
+    && command -v truncate \
+    && ldconfig -p | grep -q 'libglib-2.0.so.0' \
+    && ldconfig -p | grep -q 'libpixman-1.so.0' \
+    && ldconfig -p | grep -q 'libpng16.so.16' \
+    && ldconfig -p | grep -q 'libslirp.so.0'
+
+WORKDIR /workdir
+
+CMD ["bash"]

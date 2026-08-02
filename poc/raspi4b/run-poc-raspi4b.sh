@@ -2,12 +2,17 @@
 # raspi4b(T3) 자동테스트 하니스 — SD 이미지에 바이너리 주입 → 부팅·실행 → 결과 회수
 # raspi4b엔 virtio-9p가 없으므로, 호스트에서 SD rootfs를 마운트해 파일을 주고받는다.
 # 사용법: (앱을 넣으려면) cp myapp poc/raspi4b/testfiles/  후  bash poc/raspi4b/run-poc-raspi4b.sh
-set -e
+set -euo pipefail
 BASE=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SRC_WIC=$BASE/rpi4.wic                       # ttyAMA0 getty 포함 rootfs
 SD=$BASE/poc/raspi4b/rpi4b-test.wic
 OFF=$((155648*512))                          # p2(rootfs) 시작 오프셋
-RUNNER=qemu-runner:latest                    # expect/libslirp 포함(QEMU는 qemu92-install/을 마운트)
+RUNNER=${TEST_CONTAINER_IMAGE:-device-simulation-test:latest}
+
+if ! docker inspect "$RUNNER" >/dev/null 2>&1; then
+  echo "[준비] 테스트 러너 이미지 빌드 중..."
+  TEST_CONTAINER_IMAGE="$RUNNER" "$BASE/build-test-image.sh"
+fi
 
 echo "[1/4] SD 이미지 준비 (raspi4b는 2의 거듭제곱 크기 필요 → 512MiB)"
 cp -f "$SRC_WIC" "$SD"
