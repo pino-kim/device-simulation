@@ -7,6 +7,8 @@
 - `build-qemu.sh` — qemu 8.2 소스 빌드 (컨테이너, root)
 - `build-qemu92.sh` — qemu 9.2 빌드. **raspi4b(BCM2711) 머신 포함** → T3(SoC 레벨 커널 테스트)용. slirp 포함
 - `build-kernel-virtio.sh` — 커널에 virtio/9p built-in 추가해 재빌드
+- `Dockerfile.test` — QEMU 자동테스트에 필요한 expect/런타임 도구 이미지
+- `build-test-image.sh` — 테스트 러너 이미지 빌드
 - `kernel-overlay/` — 커널 config 프래그먼트(virtio.cfg) + bbappend. 빌드 시 `sources/meta-raspberrypi/recipes-kernel/linux/`에 배치됨
 - `poc/` — 자동테스트 PoC
   - `run-poc.sh` — 호스트에서 실행. QEMU 부팅 → 9p 마운트 → 테스트 → result.txt 회수 → 종료
@@ -16,6 +18,7 @@
 
 ## 사용 (바이너리만 교체해 테스트)
 ```
+./build-test-image.sh  # 최초 1회. 생략해도 run-poc.sh가 자동 빌드
 cp <새 앱 바이너리> poc/testshare/myapp
 bash poc/run-poc.sh
 # → poc/testshare/result.txt 로 결과 회수
@@ -82,9 +85,26 @@ build/tmp/deploy/images/raspberrypi4-64/
 
 ## QEMU 8.2 빌드와 virt 부팅
 
-QEMU는 `qemu-runner:latest` 이미지에 포함되지 않는다. 기존 빌드
+QEMU는 테스트 러너 이미지에 포함되지 않는다. 기존 빌드
 스크립트를 crops 컨테이너에서 실행해 프로젝트의 `qemu-install/`에
 설치한다.
+
+테스트 러너 이미지는 다음과 같이 준비한다. `run-poc.sh`와 raspi4b
+하니스는 이미지가 없을 때 이 명령을 자동 실행한다.
+
+```
+./build-test-image.sh
+```
+
+일반 호스트에서는 `Dockerfile.test`가 Ubuntu 22.04 기반 테스트 환경을
+직접 구성한다. 이 프로젝트의 레거시 Docker 1.13 호스트에서는 빌드
+스크립트가 `Dockerfile.test.legacy`를 자동 선택하며, 기존 Ubuntu 22.04
+기반 `qemu-runner:latest`의 필수 명령과 공유 라이브러리를 검증한다.
+
+Ubuntu 24.04 호스트에서도 Docker Engine이 최신 Ubuntu 이미지를 지원하면
+동일하게 실행할 수 있다. 호스트가 x86_64여야 현재 QEMU 바이너리와
+호환되며, 전체 테스트 전 `bootstrap-yocto.sh`, `build-yocto.sh`, QEMU
+빌드 및 `prepare-image.sh` 단계의 산출물이 필요하다.
 
 ```
 docker run --rm --user 0 --security-opt seccomp=unconfined \
@@ -97,11 +117,11 @@ docker run --rm --user 0 --security-opt seccomp=unconfined \
 
 ```
 docker run --rm --security-opt seccomp=unconfined \
-  -v "$PWD":/workdir qemu-runner:latest \
+  -v "$PWD":/workdir device-simulation-test:latest \
   /workdir/qemu-install/bin/qemu-system-aarch64 --version
 
 docker run --rm --security-opt seccomp=unconfined \
-  -v "$PWD":/workdir qemu-runner:latest \
+  -v "$PWD":/workdir device-simulation-test:latest \
   /workdir/qemu-install/bin/qemu-system-aarch64 -machine help
 ```
 

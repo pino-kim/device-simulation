@@ -35,10 +35,16 @@ docker run --rm --user 0 --security-opt seccomp=unconfined \
 
 ## 5. QEMU 버전 확인
 
+먼저 테스트 러너 이미지를 빌드한다.
+
+```bash
+./build-test-image.sh
+```
+
 ```bash
 docker run --rm --security-opt seccomp=unconfined \
   -v "$PWD":/workdir \
-  qemu-runner:latest \
+  device-simulation-test:latest \
   /workdir/qemu-install/bin/qemu-system-aarch64 --version
 ```
 
@@ -53,7 +59,7 @@ QEMU emulator version 8.2.0
 ```bash
 docker run --rm --security-opt seccomp=unconfined \
   -v "$PWD":/workdir \
-  qemu-runner:latest \
+  device-simulation-test:latest \
   /workdir/qemu-install/bin/qemu-system-aarch64 -machine help
 ```
 
@@ -107,6 +113,7 @@ bash -n \
   bootstrap-yocto.sh \
   build-yocto.sh \
   build-qemu.sh \
+  build-test-image.sh \
   prepare-image.sh \
   poc/run-poc.sh \
   poc/testshare/run-tests.sh
