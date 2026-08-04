@@ -21,8 +21,21 @@ fi
 KERNEL_APPEND="${KERNEL_APPEND:-$DEFAULT_KERNEL_APPEND}"
 RPI4_NET_MODE="${RPI4_NET_MODE:-none}"
 RPI4_NET_SOCKET="${RPI4_NET_SOCKET:-listen=:12345}"
+RPI4_NET_TAP="${RPI4_NET_TAP:-rpi4tap0}"
 RPI4_PCIE_DEVICE="${RPI4_PCIE_DEVICE:-none}"
 [[ -f "$DTB" ]] || die "DTB를 찾을 수 없습니다: $DTB"
+
+if [[ "$RPI4_NET_MODE" == "tap" ]]; then
+    require_command ip
+    [[ "$RPI4_NET_TAP" =~ ^[a-zA-Z0-9_.-]{1,15}$ ]] ||
+        die "안전하지 않은 TAP 인터페이스 이름입니다: $RPI4_NET_TAP"
+    ip link show dev "$RPI4_NET_TAP" >/dev/null 2>&1 ||
+        die "TAP 인터페이스가 없습니다: $RPI4_NET_TAP
+먼저 Host에서 TAP을 생성하고 IP를 설정하십시오:
+  sudo ip tuntap add dev $RPI4_NET_TAP mode tap user $USER
+  sudo ip addr add 192.168.76.1/24 dev $RPI4_NET_TAP
+  sudo ip link set $RPI4_NET_TAP up"
+fi
 
 if [[ ! -f "$CONSOLE_WIC" || "${RESET_WIC:-0}" == "1" ]]; then
     echo "대화형 SD 이미지 준비: $CONSOLE_WIC"
@@ -51,7 +64,12 @@ case "$RPI4_PCIE_DEVICE" in
             none) ;;
             user) QEMU_NET_ARGS=(-nic user,model=bcm2838-genet) ;;
             socket) QEMU_NET_ARGS=(-nic "socket,model=bcm2838-genet,$RPI4_NET_SOCKET") ;;
-            *) die "RPI4_NET_MODE은 none, user, socket 중 하나여야 합니다." ;;
+            tap)
+                QEMU_NET_ARGS=(
+                    -nic "tap,model=bcm2838-genet,ifname=$RPI4_NET_TAP,script=no,downscript=no"
+                )
+                ;;
+            *) die "RPI4_NET_MODE은 none, user, socket, tap 중 하나여야 합니다." ;;
         esac
         ;;
     virtio-net-pci)
@@ -73,7 +91,13 @@ case "$RPI4_PCIE_DEVICE" in
                     -device virtio-net-pci,bus=pcie.1,netdev=pcienet0,disable-modern=off,disable-legacy=on,vectors=0
                 )
                 ;;
-            *) die "RPI4_NET_MODE은 none, user, socket 중 하나여야 합니다." ;;
+            tap)
+                QEMU_NET_ARGS=(
+                    -netdev "tap,id=pcienet0,ifname=$RPI4_NET_TAP,script=no,downscript=no"
+                    -device virtio-net-pci,bus=pcie.1,netdev=pcienet0,disable-modern=off,disable-legacy=on,vectors=0
+                )
+                ;;
+            *) die "RPI4_NET_MODE은 none, user, socket, tap 중 하나여야 합니다." ;;
         esac
         ;;
     *)

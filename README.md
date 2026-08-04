@@ -83,6 +83,36 @@ virtio 장치는 Guest의 `eth0`, GENET은 `eth1`로 등록된다.
 `PASS`가 표시된다. TAP 생성에는 root 권한이 필요하며, 일반 사용자로
 실행하면 스크립트가 `sudo`로 다시 실행한다.
 
+GENET TAP에 대화형 콘솔로 접속하려면 Host TAP을 먼저 준비한 뒤 콘솔
+스크립트에 전달한다.
+
+```bash
+sudo ip tuntap add dev rpi4tap0 mode tap user "$USER"
+sudo ip addr add 192.168.76.1/24 dev rpi4tap0
+sudo ip link set rpi4tap0 up
+
+RPI4_NET_MODE=tap \
+RPI4_NET_TAP=rpi4tap0 \
+RESET_WIC=1 \
+./run-rpi4-console.sh
+```
+
+Guest 콘솔에서는 GENET 인터페이스에 주소를 설정한 뒤 Host로 ping한다.
+
+```bash
+ip link set eth0 up
+ip addr add 192.168.76.2/24 dev eth0
+ping -c 3 192.168.76.1
+```
+
+Host의 다른 터미널에서는 `ping -c 3 192.168.76.2`로 반대 방향을
+확인한다. 작업 종료 후 TAP은 다음처럼 제거한다.
+
+```bash
+sudo ip link set rpi4tap0 down
+sudo ip tuntap del dev rpi4tap0 mode tap
+```
+
 ## PCIe USB/xHCI 테스트
 
 ### 구현 범위
