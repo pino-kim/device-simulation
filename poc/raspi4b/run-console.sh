@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BASE=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-QEMU="${BASE}/qemu92-install/bin/qemu-system-aarch64"
+QEMU="${BASE}/qemu-install/bin/qemu-system-aarch64"
 KERNEL="${BASE}/build/tmp/deploy/images/raspberrypi4-64/Image-raspberrypi4-64.bin"
 DTB="${BASE}/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b.dtb"
 SOURCE_WIC="${BASE}/rpi4.wic"
@@ -63,7 +63,13 @@ fi
 if [ "$FRESH" -eq 1 ] || [ ! -f "$CONSOLE_WIC" ]; then
     echo "[준비] 콘솔용 SD 이미지 생성: $CONSOLE_WIC"
     cp -f "$SOURCE_WIC" "$CONSOLE_WIC"
-    truncate -s 512M "$CONSOLE_WIC"
+    image_size=$(stat -c %s "$CONSOLE_WIC")
+    sd_size=1
+    while [ "$sd_size" -lt "$image_size" ]; do
+        sd_size=$((sd_size * 2))
+    done
+    truncate -s "$sd_size" "$CONSOLE_WIC"
+    echo "[준비] QEMU SD 크기: ${sd_size} bytes"
 else
     echo "[재사용] 기존 콘솔용 SD 이미지: $CONSOLE_WIC"
 fi
@@ -76,7 +82,7 @@ exec docker run --rm -it \
     -v "$BASE":/workdir \
     -w /workdir \
     "$RUNNER" \
-    /workdir/qemu92-install/bin/qemu-system-aarch64 \
+    /workdir/qemu-install/bin/qemu-system-aarch64 \
     -M raspi4b \
     -cpu cortex-a72 \
     -m 2G \

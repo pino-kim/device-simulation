@@ -16,6 +16,7 @@ RUN apt-get update \
         libpng16-16 \
         libpulse0 \
         libslirp0 \
+        libusb-1.0-0 \
         util-linux \
         zlib1g \
     && rm -rf /var/lib/apt/lists/*

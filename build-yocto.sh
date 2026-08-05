@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 IMAGE=${YOCTO_CONTAINER_IMAGE:-crops/yocto:ubuntu-22.04-base}
 
-if [ ! -f "${ROOT}/sources/poky/oe-init-build-env" ]; then
+if [ ! -f "${ROOT}/sources/oe-core/oe-init-build-env" ]; then
     echo "Yocto sources are missing. Run ./bootstrap-yocto.sh first." >&2
     exit 1
 fi

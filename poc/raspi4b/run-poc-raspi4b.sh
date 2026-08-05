@@ -14,9 +14,15 @@ if ! docker inspect "$RUNNER" >/dev/null 2>&1; then
   TEST_CONTAINER_IMAGE="$RUNNER" "$BASE/build-test-image.sh"
 fi
 
-echo "[1/4] SD 이미지 준비 (raspi4b는 2의 거듭제곱 크기 필요 → 512MiB)"
+echo "[1/4] SD 이미지 준비 (raspi4b가 요구하는 2의 거듭제곱 크기로 확장)"
 cp -f "$SRC_WIC" "$SD"
-truncate -s 512M "$SD"
+image_size=$(stat -c %s "$SD")
+sd_size=1
+while [ "$sd_size" -lt "$image_size" ]; do
+  sd_size=$((sd_size * 2))
+done
+truncate -s "$sd_size" "$SD"
+echo "  QEMU SD 크기: ${sd_size} bytes"
 
 echo "[2/4] 테스트/바이너리 주입 (rootfs p2 → /home/root/hosttest)"
 docker run --rm --privileged -v "$BASE":/workdir "$RUNNER" bash -c "
