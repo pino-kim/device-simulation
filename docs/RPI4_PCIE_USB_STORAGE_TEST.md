@@ -1,10 +1,14 @@
-# Raspberry Pi 4 PCIe xHCI 물리 USB 메모리 시험
+# Raspberry Pi 4 PCIe xHCI Host USB 메모리 시험
 
-## 목적
+## 목적과 범위
 
 패치된 QEMU `raspi4b`의 BCM2711 PCIe root port에 범용 `qemu-xhci`
 endpoint를 연결하고, Host의 물리 USB 메모리를 `usb-host`로 전달하여
 Guest의 USB mass-storage 및 블록 읽기 경로를 검증한다.
+
+`qemu-xhci`는 USB 3 SuperSpeed capable controller지만 시험한 SanDisk
+장치는 USB 2.0 High-Speed 제품이다. 따라서 이 시험은 PCIe xHCI를 통한
+물리 USB 전달 시험이며 실제 USB 3 전송 성능 시험은 아니다.
 
 ## 시험 환경
 

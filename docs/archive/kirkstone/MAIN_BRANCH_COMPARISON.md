@@ -1,5 +1,9 @@
 # main 브랜치 대비 변경 사항
 
+> 보관 문서: 2026-08-02 당시 Kirkstone/QEMU 8.2·9.2 기반 브랜치 비교
+> 기록이다. 현재 `fw`의 Wrynose 6.0.2/QEMU 11.0.3 구성 설명으로
+> 사용하지 않는다. 최신 사용법과 검증 결과는 `docs/README.md`에서 찾는다.
+
 작성일: 2026-08-02
 
 비교 기준: `main` (`cd2d55f`) → `fw` (`9ad5eb7`)
@@ -37,7 +41,7 @@
   `build-test-image.sh`, `.dockerignore`
 - 테스트 하니스: `poc/run-poc.sh`, `poc/raspi4b/run-poc-raspi4b.sh`,
   `poc/raspi4b/run-console.sh`
-- 검증 문서: `review/`
+- 당시 검증 문서: 현재 `docs/archive/kirkstone/`에 보관
 
 ## Ubuntu 24.04 외부 호스트 호환성
 

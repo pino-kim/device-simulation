@@ -20,7 +20,7 @@ Usage: bash poc/raspi4b/run-console.sh [--fresh]
   --fresh  기존 콘솔용 SD 이미지를 버리고 rpi4.wic에서 다시 생성
   -h       도움말 출력
 
-PCIe USB 3 장치 전달:
+PCIe xHCI Host USB 장치 전달:
   RPI4_USB_BUS=1 RPI4_USB_ADDR=22 \
     bash poc/raspi4b/run-console.sh --fresh
 

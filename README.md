@@ -96,7 +96,7 @@ QEMU 11.0.3과 별도 QEMU 콘솔 DTB로 다음 항목을 확인했다.
 - Cortex-A72 4개 CPU 기동
 - Linux 6.18.33 부팅
 - `/dev/mmcblk1p2` rootfs 마운트 및 읽기/쓰기 remount
-- systemd 259.2 실행과 multi-user 서비스 시작
+- systemd 259.5 실행과 multi-user 서비스 시작
 - PL011 `ttyAMA0` 로그인, 명령 입력 및 정상 poweroff
 - UUID 기반 `/boot` 마운트
 
@@ -119,7 +119,7 @@ root=/dev/mmcblk1p2 rootwait rw
 Wrynose stock DTB 부팅 로그에서 확인한 흐름은 다음과 같다.
 
 1. PL011 earlycon을 통해 Linux 6.18.33 로그가 정상 출력됨
-2. `/dev/mmcblk1p2`가 rootfs로 정상 마운트되고 systemd 259.2가 실행됨
+2. `/dev/mmcblk1p2`가 rootfs로 정상 마운트되고 systemd 259.5가 실행됨
 3. udev가 Bluetooth 스택과 `hci_uart_bcm`을 로드함
 4. stock DTB의 `serial0-0` Bluetooth 장치가 PL011을 사용하려고 probe함
 5. QEMU가 구현하지 않은 firmware GPIO 때문에 Bluetooth probe가 `-5`로 실패함
@@ -164,12 +164,13 @@ unshare --user --map-root-user --net \
   env BOOT_TIMEOUT=90 ./test-rpi4-pcie-network.sh
 ```
 
-## PCIe USB 3 Host 장치 전달
+## PCIe xHCI Host USB 장치 전달
 
 `run-console.sh`는 패치된 BCM2711 PCIe root port에 QEMU 범용
 `qemu-xhci` controller를 연결하고, 선택한 Host USB 장치를 Guest에
 전달할 수 있다. 실물 Raspberry Pi 4의 VL805 자체를 모델링하는 구성은
-아니지만 PCIe enumeration, xHCI와 USB 3 장치 경로를 사용한다.
+아니며, USB 3 capable QEMU xHCI controller를 통한 PCIe/USB 경로를
+검증한다. 실제 연결 속도는 전달한 물리 USB 장치의 규격에 따라 달라진다.
 
 먼저 `lsusb`에서 대상 장치의 Bus와 Device 번호를 확인한다. USB
 메모리라면 Host에서 파티션을 먼저 unmount하되 장치를 분리하지 않는다.
@@ -213,8 +214,11 @@ SanDisk Cruzer Blade 물리 장치로 수행한 PCIe xHCI, mass-storage, raw-rea
 기록한다.
 
 상세 패치 구성과 검증 결과는
-[`docs/QEMU_RPI4_PCIE_GENET_REVIEW.md`](docs/QEMU_RPI4_PCIE_GENET_REVIEW.md)에
+[`docs/QEMU_RPI4_PCIE_GENET_USB_REVIEW.md`](docs/QEMU_RPI4_PCIE_GENET_USB_REVIEW.md)에
 기록한다.
+
+현재 문서와 Kirkstone/QEMU 8.2·9.2 보관 문서의 구분은
+[`docs/README.md`](docs/README.md)에서 확인한다.
 
 대용량 `sources/`, `build/`, QEMU 소스/빌드/설치 디렉터리와 `*.wic`은
 모두 `.gitignore` 대상이다.

@@ -1,5 +1,9 @@
 # Device Simulation 검수 보고서
 
+> 보관 문서: Yocto Kirkstone와 QEMU 8.2 `virt` 머신을 대상으로 한
+> 2026-07-31 검수 결과다. 현재 `fw`의 Wrynose/QEMU 11 `raspi4b`
+> 검증 보고서가 아니며 역사적 참고 자료로만 유지한다.
+
 ## 1. 검수 기준
 
 - 검수일: 2026-07-31
