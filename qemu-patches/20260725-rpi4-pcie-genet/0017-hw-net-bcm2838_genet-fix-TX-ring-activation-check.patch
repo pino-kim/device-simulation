@@ -1,0 +1,42 @@
+From 9b9e3eb474b0c3e9a169e09dce8b321c73f9a5f8 Mon Sep 17 00:00:00 2001
+From: Marcelo Manzo <marcelomanzo@gmail.com>
+Date: Fri, 24 Jul 2026 20:42:16 -0400
+Subject: [PATCH 17/19] hw/net/bcm2838_genet: fix TX ring activation check
+
+bcm2838_genet_tdma_ring_active() extracted the per-ring enable bit
+from ring_cfg_reg using the GENET_DMA_CTRL register's EN field
+definition (1 bit wide, at bit 0) instead of GENET_DMA_RING_CFG's
+own EN field (17 bits wide, one bit per ring). Since a 1-bit
+extraction at bit 0 only ever reflects ring 0's enable bit, every
+other ring (1-15, and the default ring 16) was silently treated as
+inactive regardless of whether the driver had actually enabled it.
+TX traffic hashed onto those queues was dropped with no error,
+eventually tripping the guest's qdisc watchdog ("NETDEV WATCHDOG:
+transmit queue N timed out") and causing intermittent DHCP failure /
+link-local address fallback.
+
+bcm2838_genet_rdma_ring_active(), the RX equivalent, already used
+the correct field, confirming this was a copy-paste error isolated
+to the TX path.
+
+Confirmed fixed across repeated boots: real DHCP lease every time,
+0% ping loss, no more checksum or watchdog messages in dmesg.
+
+Signed-off-by: Marcelo Manzo <marcelomanzo@gmail.com>
+---
+ hw/net/bcm2838_genet.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/hw/net/bcm2838_genet.c b/hw/net/bcm2838_genet.c
+index 6f8f4e5..43583ab 100644
+--- a/hw/net/bcm2838_genet.c
++++ b/hw/net/bcm2838_genet.c
+@@ -515,7 +515,7 @@ static bool bcm2838_genet_tdma_ring_active(BCM2838GenetState *s,
+     uint32_t ring_mask = 1 << ring_index;
+     bool dma_en = FIELD_EX32(ctrl_reg, GENET_DMA_CTRL, EN) != 0;
+     bool ring_en =
+-        (FIELD_EX32(ring_cfg_reg, GENET_DMA_CTRL, EN) & ring_mask) != 0;
++        (FIELD_EX32(ring_cfg_reg, GENET_DMA_RING_CFG, EN) & ring_mask) != 0;
+     bool ring_buf_en =
+         (FIELD_EX32(ctrl_reg, GENET_DMA_CTRL, RING_BUF_EN) & ring_mask) != 0;
+     bool active = dma_en && ring_en && ring_buf_en;

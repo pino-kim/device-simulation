@@ -1,0 +1,47 @@
+From: Codex <codex@local>
+Date: Thu, 30 Jul 2026 00:00:00 +0900
+Subject: [PATCH 20/20] hw/net/bcm2838_genet: fix DMA disable status mask
+
+Linux bcmgenet checks the disabled state for DMA_EN and every
+RING_BUF_EN bit while halting TDMA and RDMA.  Mirroring only bit zero,
+and deriving it from the previous enable value, makes DMA shutdown time
+out with the Yocto Wrynose Raspberry Pi kernel.
+
+Mirror the disabled state of the complete 18-bit DMA control mask for
+both TX and RX.
+---
+ hw/net/bcm2838_genet.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/hw/net/bcm2838_genet.c b/hw/net/bcm2838_genet.c
+--- a/hw/net/bcm2838_genet.c
++++ b/hw/net/bcm2838_genet.c
+@@ -622,10 +622,12 @@ static void bcm2838_genet_tdma(BCM2838GenetState *s, hwaddr offset,
+         }
+         break;
+     case BCM2838_GENET_TDMA_CTRL:
++        /*
++         * Linux checks DMA_STATUS for DMA_EN and all RING_BUF_EN bits.
++         * Mirror the disabled state of the complete 18-bit control mask.
++         */
++        s->regs.tdma.status = (~dma_ctrl) & MAKE_64BIT_MASK(0, 18);
+         if (exst_tdma_en != incm_tdma_en) {
+-            s->regs.tdma.status = FIELD_DP32(s->regs.tdma.status,
+-                                             GENET_DMA_STATUS,
+-                                             DISABLED, !exst_tdma_en);
+             trace_bcm2838_genet_tx_dma(incm_tdma_en == 1
+                                        ? "enabled"
+                                        : "disabled");
+@@ -731,6 +733,10 @@ static void bcm2838_genet_write(void *opaque, hwaddr offset, uint64_t value,
+             ... BCM2838_GENET_TDMA_REGS + sizeof(BCM2838GenetRegsTdma) - 1:
+             bcm2838_genet_tdma(s, offset, value);
+             break;
++        case BCM2838_GENET_RDMA_CTRL:
++            /* See the TDMA_CTRL handling above. */
++            s->regs.rdma.status = (~value) & MAKE_64BIT_MASK(0, 18);
++            break;
+         default:
+             break;
+         }
+-- 
+2.47.1

@@ -1,0 +1,130 @@
+From c6cf70a92af187cec68253f08b78fbc249dd6202 Mon Sep 17 00:00:00 2001
+From: Marcelo Manzo <marcelomanzo@gmail.com>
+Date: Fri, 24 Jul 2026 20:42:02 -0400
+Subject: [PATCH 03/19] hw/arm/bcm2838: enable BCM2838 PCIe host bridge
+
+Wire the BCM2838 PCIe host bridge (added in the previous two
+patches) into the SoC: instantiate it in the peripherals block, map
+its register and MMIO regions at the real BCM2711 physical
+addresses, and route its interrupts through the GIC. Also stop
+raspi4b from masking out the "brcm,bcm2711-pcie" device-tree node,
+now that the controller it describes is actually implemented.
+
+Adapted from patches 14-15/41 of Sergey Kambalin's Raspberry Pi 4B
+series (patchwork series 829638) against current QEMU master.
+
+Signed-off-by: Marcelo Manzo <marcelomanzo@gmail.com>
+---
+ hw/arm/bcm2838.c                     |  9 +++++++++
+ hw/arm/bcm2838_peripherals.c         | 23 +++++++++++++++++++++++
+ hw/arm/raspi4b.c                     |  1 -
+ include/hw/arm/bcm2838_peripherals.h |  2 ++
+ 4 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/hw/arm/bcm2838.c b/hw/arm/bcm2838.c
+index c14a854..9046aab 100644
+--- a/hw/arm/bcm2838.c
++++ b/hw/arm/bcm2838.c
+@@ -226,6 +226,15 @@ static void bcm2838_realize(DeviceState *dev, Error **errp)
+     qdev_connect_gpio_out(dma_9_10_irq_orgate, 0,
+                           qdev_get_gpio_in(gicdev, GIC_SPI_INTERRUPT_DMA_9_10));
+ 
++    /* Connect PCIe host bridge to the interrupt controller */
++    for (int n = 0; n < BCM2838_PCIE_NUM_IRQS; n++) {
++        int int_n = GIC_SPI_INTERRUPT_PCI_INT_A + n;
++        sysbus_connect_irq(SYS_BUS_DEVICE(&ps->pcie_host), n,
++                           qdev_get_gpio_in(gicdev, int_n));
++        bcm2838_pcie_host_set_irq_num(BCM2838_PCIE_HOST(&ps->pcie_host), n,
++                                      int_n);
++    }
++
+     /* Pass through inbound GPIO lines to the GIC */
+     qdev_init_gpio_in(dev, bcm2838_gic_set_irq, GIC_NUM_IRQS);
+ 
+diff --git a/hw/arm/bcm2838_peripherals.c b/hw/arm/bcm2838_peripherals.c
+index 812b5b8..f71937a 100644
+--- a/hw/arm/bcm2838_peripherals.c
++++ b/hw/arm/bcm2838_peripherals.c
+@@ -15,6 +15,11 @@
+ #define CLOCK_ISP_OFFSET        0xc11000
+ #define CLOCK_ISP_SIZE          0x100
+ 
++#define PCIE_RC_OFFSET          0x1500000
++#define PCIE_MMIO_OFFSET        0xc0000000
++#define PCIE_MMIO_ARM_OFFSET    0x600000000
++#define PCIE_MMIO_SIZE          0x40000000
++
+ /* Lower peripheral base address on the VC (GPU) system bus */
+ #define BCM2838_VC_PERI_LOW_BASE 0x7c000000
+ 
+@@ -35,6 +40,10 @@ static void bcm2838_peripherals_init(Object *obj)
+     /* Extended Mass Media Controller 2 */
+     object_initialize_child(obj, "emmc2", &s->emmc2, TYPE_SYSBUS_SDHCI);
+ 
++    /* PCIe Host Bridge */
++    object_initialize_child(obj, "pcie-host", &s->pcie_host,
++                            TYPE_BCM2838_PCIE_HOST);
++
+     /* GPIO */
+     object_initialize_child(obj, "gpio", &s->gpio, TYPE_BCM2838_GPIO);
+ 
+@@ -67,6 +76,8 @@ static void bcm2838_peripherals_realize(DeviceState *dev, Error **errp)
+     MemoryRegion *mphi_mr;
+     BCM2838PeripheralState *s = BCM2838_PERIPHERALS(dev);
+     BCMSocPeripheralBaseState *s_base = BCM_SOC_PERIPHERALS_BASE(dev);
++    MemoryRegion *regs_mr;
++    MemoryRegion *mmio_mr;
+     int n;
+ 
+     bcm_soc_peripherals_common_realize(dev, errp);
+@@ -182,6 +193,18 @@ static void bcm2838_peripherals_realize(DeviceState *dev, Error **errp)
+     create_unimp(s_base, &s->clkisp, "bcm2835-clkisp", CLOCK_ISP_OFFSET,
+                  CLOCK_ISP_SIZE);
+ 
++    /* PCIe Root Complex */
++    if (!sysbus_realize(SYS_BUS_DEVICE(&s->pcie_host), errp)) {
++        return;
++    }
++    /* RC registers region */
++    regs_mr = sysbus_mmio_get_region(SYS_BUS_DEVICE(&s->pcie_host), 0);
++    memory_region_add_subregion(&s->peri_low_mr, PCIE_RC_OFFSET, regs_mr);
++    /* MMIO region */
++    mmio_mr = sysbus_mmio_get_region(SYS_BUS_DEVICE(&s->pcie_host), 1);
++    memory_region_add_subregion(get_system_memory(), PCIE_MMIO_ARM_OFFSET,
++                                mmio_mr);
++
+     /* GPIO */
+     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp)) {
+         return;
+diff --git a/hw/arm/raspi4b.c b/hw/arm/raspi4b.c
+index 3eeb8f4..30d33bd 100644
+--- a/hw/arm/raspi4b.c
++++ b/hw/arm/raspi4b.c
+@@ -64,7 +64,6 @@ static void raspi4_modify_dtb(const struct arm_boot_info *info, void *fdt)
+ 
+     /* Temporarily disable following devices until they are implemented */
+     const char *nodes_to_remove[] = {
+-        "brcm,bcm2711-pcie",
+         "brcm,bcm2711-rng200",
+         "brcm,bcm2711-thermal",
+         "brcm,bcm2711-genet-v5",
+diff --git a/include/hw/arm/bcm2838_peripherals.h b/include/hw/arm/bcm2838_peripherals.h
+index 7ee1bd0..06c9624 100644
+--- a/include/hw/arm/bcm2838_peripherals.h
++++ b/include/hw/arm/bcm2838_peripherals.h
+@@ -10,6 +10,7 @@
+ #define BCM2838_PERIPHERALS_H
+ 
+ #include "hw/arm/bcm2835_peripherals.h"
++#include "hw/arm/bcm2838_pcie.h"
+ #include "hw/sd/sdhci.h"
+ #include "hw/gpio/bcm2838_gpio.h"
+ 
+@@ -64,6 +65,7 @@ struct BCM2838PeripheralState {
+     MemoryRegion mphi_mr_alias;
+ 
+     SDHCIState emmc2;
++    BCM2838PcieHostState pcie_host;
+     BCM2838GpioState gpio;
+ 
+     OrIRQState mmc_irq_orgate;

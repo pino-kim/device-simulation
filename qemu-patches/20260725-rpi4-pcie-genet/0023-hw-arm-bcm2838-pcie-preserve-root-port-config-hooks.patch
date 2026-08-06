@@ -1,0 +1,68 @@
+From: Codex <codex@local>
+Date: Thu, 30 Jul 2026 00:00:00 +0900
+Subject: [PATCH 23/24] hw/arm/bcm2838_pcie: preserve root port config hooks
+
+Do not override the PCIe root port configuration callbacks with the
+plain PCI defaults. The parent root-port write callback updates bridge
+MMIO aliases when Linux enables memory decoding or changes the bridge
+base and limit. Bypassing it left the downstream MMIO window at zero
+size, causing an external abort on the first virtio BAR access.
+
+Route host-side accesses through the common PCI host helpers so they
+invoke the inherited root-port callbacks.
+---
+ hw/arm/bcm2838_pcie.c | 27 ++++++++-------------------
+ 1 file changed, 8 insertions(+), 19 deletions(-)
+
+diff --git a/hw/arm/bcm2838_pcie.c b/hw/arm/bcm2838_pcie.c
+--- a/hw/arm/bcm2838_pcie.c
++++ b/hw/arm/bcm2838_pcie.c
+@@ -17,18 +17,6 @@
+ #include "hw/arm/bcm2838_pcie.h"
+ #include "trace.h"
+ 
+-static uint32_t bcm2838_pcie_config_read(PCIDevice *d,
+-                                         uint32_t address, int len)
+-{
+-    return pci_default_read_config(d, address, len);
+-}
+-
+-static void bcm2838_pcie_config_write(PCIDevice *d, uint32_t addr, uint32_t val,
+-                                      int len)
+-{
+-    return pci_default_write_config(d, addr, val, len);
+-}
+-
+ static uint64_t bcm2838_pcie_host_read(void *opaque, hwaddr offset,
+                                        unsigned size) {
+     hwaddr mmcfg_addr;
+@@ -44,5 +32,6 @@ static uint64_t bcm2838_pcie_host_read(void *opaque, hwaddr offset,
+     if (offset + size <= PCIE_CONFIG_SPACE_SIZE) {
+-        value = pci_default_read_config(PCI_DEVICE(&s->root_port),
+-                                        offset, size);
++        value = pci_host_config_read_common(PCI_DEVICE(&s->root_port),
++                                            offset, PCIE_CONFIG_SPACE_SIZE,
++                                            size);
+     } else if (offset - PCIE_CONFIG_SPACE_SIZE + size
+                <= sizeof(s->root_port.regs)) {
+@@ -81,5 +70,6 @@ static void bcm2838_pcie_host_write(void *opaque, hwaddr offset,
+     if (offset + size <= PCIE_CONFIG_SPACE_SIZE) {
+-        pci_default_write_config(PCI_DEVICE(&s->root_port),
+-                                 offset, value, size);
++        pci_host_config_write_common(PCI_DEVICE(&s->root_port),
++                                     offset, PCIE_CONFIG_SPACE_SIZE,
++                                     value, size);
+     } else if (offset - PCIE_CONFIG_SPACE_SIZE + size
+                <= sizeof(s->root_port.regs)) {
+@@ -281,9 +271,6 @@ static void bcm2838_pcie_root_class_init(ObjectClass *class, const void *data)
+     k->device_id = BCM2838_PCIE_DEVICE_ID;
+     k->revision = BCM2838_PCIE_REVISION;
+ 
+-    k->config_read = bcm2838_pcie_config_read;
+-    k->config_write = bcm2838_pcie_config_write;
+-
+     rpc->exp_offset = BCM2838_PCIE_EXP_CAP_OFFSET;
+     rpc->aer_offset = BCM2838_PCIE_AER_CAP_OFFSET;
+ }
+-- 
+2.47.1

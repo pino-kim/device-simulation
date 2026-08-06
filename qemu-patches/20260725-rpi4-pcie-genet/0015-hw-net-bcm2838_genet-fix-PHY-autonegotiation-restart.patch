@@ -1,0 +1,62 @@
+From d8b330e045e839e18d1be4075e1ba119e230b77c Mon Sep 17 00:00:00 2001
+From: Marcelo Manzo <marcelomanzo@gmail.com>
+Date: Fri, 24 Jul 2026 20:42:14 -0400
+Subject: [PATCH 15/19] hw/net/bcm2838_genet: fix PHY autonegotiation-restart
+ deadlock
+
+The guest PHY driver requests an autonegotiation restart by setting
+BMCR.ANRESTART, then polls BMCR waiting for the hardware to clear
+that bit as an acknowledgment. bcm2838_genet_mdio_cmd() called
+FIELD_DP16() to clear ANRESTART in phy_reg_data but discarded its
+return value -- FIELD_DP16() does not modify its argument in place,
+it returns a new value -- so the bit was never actually cleared in
+the register the guest reads back. The guest driver then spun
+forever waiting for an acknowledgment that would never come,
+appearing to hang the whole boot.
+
+Assign the FIELD_DP16() result back to phy_reg_data, and also call
+bcm2838_genet_phy_update_link() once the restart is handled so link
+status actually gets refreshed, matching the surrounding code's own
+comment ("Initiate auto-negotiation once it has been restarted").
+
+Found by booting a real guest against this series and tracing the
+MDIO command register with targeted debug prints: the guest was
+observed polling BMCR indefinitely, always reading back the
+ANRESTART bit still set. Confirmed fixed across repeated boots: link
+comes up and autonegotiation completes every time.
+
+Signed-off-by: Marcelo Manzo <marcelomanzo@gmail.com>
+---
+ hw/net/bcm2838_genet.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/hw/net/bcm2838_genet.c b/hw/net/bcm2838_genet.c
+index 59393d8..e34c181 100644
+--- a/hw/net/bcm2838_genet.c
++++ b/hw/net/bcm2838_genet.c
+@@ -20,6 +20,8 @@
+ #include "hw/net/bcm2838_genet.h"
+ #include "trace.h"
+ 
++static void bcm2838_genet_phy_update_link(BCM2838GenetState *s);
++
+ /* GENET layouts */
+ REG32(GENET_SYS_REV_CTRL,              0)
+ FIELD(GENET_SYS_REV_CTRL, GPHY_REV,    0, 16)
+@@ -390,10 +392,15 @@ static uint64_t bcm2838_genet_mdio_cmd(BCM2838GenetState *s, uint64_t cmd)
+                 if (phy_reg_id == BCM2838_GENET_PHY_BMCR) {
+                     /* Initiate auto-negotiation once it has been restarted */
+                     if (anrestart == 1) {
+-                        FIELD_DP16(phy_reg_data, GENET_PHY_BMCR, ANRESTART, 0);
++                        phy_reg_data = FIELD_DP16(phy_reg_data,
++                                                  GENET_PHY_BMCR,
++                                                  ANRESTART, 0);
+                     }
+                 }
+                 *phy_reg = phy_reg_data;
++                if (phy_reg_id == BCM2838_GENET_PHY_BMCR && anrestart == 1) {
++                    bcm2838_genet_phy_update_link(s);
++                }
+             }
+         }
+     }

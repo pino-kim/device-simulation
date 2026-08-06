@@ -1,0 +1,65 @@
+From c83f48c018a8f43b8f0aa81c0784f004aa009b71 Mon Sep 17 00:00:00 2001
+From: Marcelo Manzo <marcelomanzo@gmail.com>
+Date: Fri, 24 Jul 2026 20:42:18 -0400
+Subject: [PATCH 19/19] tests/functional/aarch64: add raspi4b GENET networking
+ test
+
+Add test_arm_raspi4_genet, exercising the raspi4b GENET controller
+end to end: boot with a -nic bcm2838-genet device attached, confirm
+the guest driver probes it ("GENET 5.0 EPHY" in the kernel log),
+reach a shell, and confirm the link actually comes up
+("ip link show eth0" reports LOWER_UP) rather than just that the
+device exists.
+
+Verified locally against this series with the exact kernel/initrd
+assets this file already pins (raspberrypi-kernel_1.20230106-1 /
+groeck linux-build-test rootfs): without the "fix PHY
+autonegotiation-restart deadlock" patch earlier in this series, the
+link never comes up and this test would hang at the "ip link show
+eth0" step, so it also serves as a regression test for that fix.
+
+Signed-off-by: Marcelo Manzo <marcelomanzo@gmail.com>
+---
+ tests/functional/aarch64/test_raspi4.py | 30 +++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/tests/functional/aarch64/test_raspi4.py b/tests/functional/aarch64/test_raspi4.py
+index 7a4302b..0e254a2 100755
+--- a/tests/functional/aarch64/test_raspi4.py
++++ b/tests/functional/aarch64/test_raspi4.py
+@@ -92,5 +92,35 @@ def test_arm_raspi4_initrd(self):
+         #self.vm.wait()
+ 
+ 
++    def test_arm_raspi4_genet(self):
++        kernel_path = self.archive_extract(self.ASSET_KERNEL_20190215,
++                                           member='boot/kernel8.img')
++        dtb_path = self.archive_extract(self.ASSET_KERNEL_20190215,
++                                        member='boot/bcm2711-rpi-4-b.dtb')
++        initrd_path = self.uncompress(self.ASSET_INITRD)
++
++        self.set_machine('raspi4b')
++        self.vm.set_console()
++        kernel_command_line = (self.KERNEL_COMMON_COMMAND_LINE +
++                               'earlycon=pl011,mmio32,0xfe201000 ' +
++                               'console=ttyAMA0,115200 ' +
++                               'panic=-1 noreboot ' +
++                               'dwc_otg.fiq_fsm_enable=0')
++        self.vm.add_args('-kernel', kernel_path,
++                         '-dtb', dtb_path,
++                         '-initrd', initrd_path,
++                         '-append', kernel_command_line,
++                         '-no-reboot',
++                         '-nic', 'user,model=bcm2838-genet')
++        self.vm.launch()
++        self.wait_for_console_pattern(
++            'bcmgenet fd580000.ethernet: GENET 5.0 EPHY')
++        self.wait_for_console_pattern('Boot successful.')
++
++        exec_command_and_wait_for_pattern(self, 'ip link show eth0',
++                                                'LOWER_UP')
++        exec_command_and_wait_for_pattern(self, 'halt', 'reboot: System halted')
++
++
+ if __name__ == '__main__':
+     LinuxKernelTest.main()
