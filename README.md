@@ -164,6 +164,54 @@ unshare --user --map-root-user --net \
   env BOOT_TIMEOUT=90 ./test-rpi4-pcie-network.sh
 ```
 
+## PCIe USB 3 Host 장치 전달
+
+`run-console.sh`는 패치된 BCM2711 PCIe root port에 QEMU 범용
+`qemu-xhci` controller를 연결하고, 선택한 Host USB 장치를 Guest에
+전달할 수 있다. 실물 Raspberry Pi 4의 VL805 자체를 모델링하는 구성은
+아니지만 PCIe enumeration, xHCI와 USB 3 장치 경로를 사용한다.
+
+먼저 `lsusb`에서 대상 장치의 Bus와 Device 번호를 확인한다. USB
+메모리라면 Host에서 파티션을 먼저 unmount하되 장치를 분리하지 않는다.
+
+```sh
+lsusb
+lsblk
+sudo umount /dev/sdX1
+```
+
+예를 들어 `Bus 001 Device 022`라면 다음처럼 실행한다.
+
+```sh
+RPI4_USB_BUS=1 RPI4_USB_ADDR=22 \
+  bash poc/raspi4b/run-console.sh --fresh
+```
+
+스크립트는 `/dev/bus/usb/001/022`만 Docker에 허용하고 다음 QEMU
+장치를 `pcie.1` 아래에 추가한다.
+
+```text
+qemu-xhci,bus=pcie.1,msi=off,msix=off
+usb-host,bus=xhci.0,hostbus=1,hostaddr=22
+```
+
+Guest에서는 다음 명령으로 PCIe xHCI와 USB 장치를 확인한다.
+
+```sh
+lspci -nn
+lsusb -t
+dmesg | grep -Ei 'xhci|usb-storage|scsi|sd[a-z]'
+lsblk
+```
+
+USB 장치를 다시 연결하면 Device 번호가 바뀔 수 있으므로 `lsusb` 결과를
+다시 확인해야 한다. QEMU를 종료하면 Host가 장치를 다시 점유한다.
+
+SanDisk Cruzer Blade 물리 장치로 수행한 PCIe xHCI, mass-storage, raw-read
+결과와 NTFS 제한은
+[`docs/RPI4_PCIE_USB_STORAGE_TEST.md`](docs/RPI4_PCIE_USB_STORAGE_TEST.md)에
+기록한다.
+
 상세 패치 구성과 검증 결과는
 [`docs/QEMU_RPI4_PCIE_GENET_REVIEW.md`](docs/QEMU_RPI4_PCIE_GENET_REVIEW.md)에
 기록한다.
