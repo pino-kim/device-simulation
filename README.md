@@ -100,9 +100,11 @@ QEMU 11.0.3과 별도 QEMU 콘솔 DTB로 다음 항목을 확인했다.
 - PL011 `ttyAMA0` 로그인, 명령 입력 및 정상 poweroff
 - UUID 기반 `/boot` 마운트
 
-공식 QEMU의 `raspi4b`는 stock DTB에서 미구현된 PCIe, RNG200, thermal,
-GENET 노드를 시작 시 비활성화한다. stock DTB는 PL011을 Bluetooth에
-연결하므로 QEMU 전용 DTB에서 해당 Bluetooth serdev 노드만 끈다.
+프로젝트 QEMU 빌드는 BCM2838 PCIe/GENET 패치 24개를 QEMU 11.0.3에
+적용한다. PCIe host bridge와 GENET을 유지하고, 아직 모델링되지 않은
+RNG200과 thermal 노드만 QEMU가 비활성화한다. stock DTB는 PL011을
+Bluetooth에 연결하므로 QEMU 전용 DTB에서 해당 Bluetooth serdev 노드만
+끈다.
 
 ### 콘솔 및 `/boot` 원인과 해결
 
@@ -139,6 +141,32 @@ QEMU의 SD 카드는 `mmcblk1`이므로 systemd가 90초 동안 잘못된 장치
 - `poc/raspi4b/run-poc-raspi4b.sh`: raspi4b SD 이미지에 테스트 파일을
   주입하고 결과를 회수하는 하니스
 - `poc/raspi4b/run-console.sh`: raspi4b 대화형 콘솔
+
+## PCIe/GENET 네트워크 테스트
+
+PCIe host bridge와 GENET probe smoke test:
+
+```sh
+BOOT_TIMEOUT=20 RPI4_NET_SOCKET=listen=:23460 ./test-rpi4-network.sh
+```
+
+격리된 network namespace에서 GENET 양방향 TAP ping:
+
+```sh
+unshare --user --map-root-user --net \
+  env BOOT_TIMEOUT=90 ./test-rpi4-tap-ping.sh
+```
+
+동일한 방식으로 PCIe 하위 `virtio-net-pci` 양방향 ping:
+
+```sh
+unshare --user --map-root-user --net \
+  env BOOT_TIMEOUT=90 ./test-rpi4-pcie-network.sh
+```
+
+상세 패치 구성과 검증 결과는
+[`docs/QEMU_RPI4_PCIE_GENET_REVIEW.md`](docs/QEMU_RPI4_PCIE_GENET_REVIEW.md)에
+기록한다.
 
 대용량 `sources/`, `build/`, QEMU 소스/빌드/설치 디렉터리와 `*.wic`은
 모두 `.gitignore` 대상이다.
