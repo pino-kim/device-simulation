@@ -2,9 +2,9 @@
 # raspi4b(BCM2711) 부팅 → 로그인 → rootfs에 주입된 테스트 실행 → result.txt 기록 → 종료
 # (바이너리/테스트는 부팅 전에 SD rootfs로 주입돼 있음 — 9p 불필요)
 set timeout 300
-set Q      "/workdir/qemu-install/bin/qemu-system-aarch64"
+set Q      [expr {[info exists env(QEMU_BIN)] ? $env(QEMU_BIN) : "/workdir/qemu-install/bin/qemu-system-aarch64"}]
 set KERNEL "/workdir/build/tmp/deploy/images/raspberrypi4-64/Image-raspberrypi4-64.bin"
-set DTB    "/workdir/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b.dtb"
+set DTB    "/workdir/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b-qemu-console.dtb"
 set SD     "/workdir/poc/raspi4b/rpi4b-test.wic"
 
 spawn $Q -M raspi4b -cpu cortex-a72 -m 2G -nographic -no-reboot \

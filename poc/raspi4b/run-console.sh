@@ -5,7 +5,7 @@ set -euo pipefail
 BASE=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 QEMU="${BASE}/qemu-install/bin/qemu-system-aarch64"
 KERNEL="${BASE}/build/tmp/deploy/images/raspberrypi4-64/Image-raspberrypi4-64.bin"
-DTB="${BASE}/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b.dtb"
+DTB="${BASE}/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b-qemu-console.dtb"
 SOURCE_WIC="${BASE}/rpi4.wic"
 CONSOLE_WIC="${BASE}/poc/raspi4b/rpi4b-console.wic"
 RUNNER=${TEST_CONTAINER_IMAGE:-device-simulation-test:latest}
