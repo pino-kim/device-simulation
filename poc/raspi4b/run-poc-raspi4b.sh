@@ -6,8 +6,15 @@ set -euo pipefail
 BASE=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SRC_WIC=$BASE/rpi4.wic                       # ttyAMA0 getty 포함 rootfs
 SD=$BASE/poc/raspi4b/rpi4b-test.wic
-OFF=$((155648*512))                          # p2(rootfs) 시작 오프셋
 RUNNER=${TEST_CONTAINER_IMAGE:-device-simulation-test:latest}
+
+rootfs_start=$(fdisk -l "$SRC_WIC" | awk -v partition="${SRC_WIC}2" \
+  '$1 == partition { print $2; exit }')
+if [[ ! "$rootfs_start" =~ ^[0-9]+$ ]]; then
+  echo "rootfs 파티션 시작 섹터를 찾지 못했습니다: $SRC_WIC" >&2
+  exit 1
+fi
+OFF=$((rootfs_start * 512))
 
 if ! docker inspect "$RUNNER" >/dev/null 2>&1; then
   echo "[준비] 테스트 러너 이미지 빌드 중..."

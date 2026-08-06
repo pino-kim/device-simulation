@@ -1,0 +1,4 @@
+# Shared Raspberry Pi 4 image for hardware and QEMU.
+# Use a filesystem UUID for /boot so mmcblk numbering does not matter.
+part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --size 100 --use-uuid
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096

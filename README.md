@@ -15,10 +15,12 @@ QEMU 빌드는 Ubuntu 22.04 컨테이너에서 수행하므로 호스트에 빌�
 - 이미지: `core-image-base`
 - Linux: 6.18.33
 - QEMU: 11.0.3, `raspi4b` revision 1.5
-- DTB: Yocto가 생성한 원본 `bcm2711-rpi-4-b.dtb`
+- 실물 DTB: 원본 `bcm2711-rpi-4-b.dtb`
+- QEMU DTB: 별도 생성한 `bcm2711-rpi-4-b-qemu-console.dtb`
 
-`meta-device-simulation`은 QEMU/테스트에 필요한 커널 config와 시리얼
-getty만 추가한다. DTB를 패치하거나 별도의 QEMU용 DTB를 만들지 않는다.
+`meta-device-simulation`은 실물용 DTB를 그대로 보존한다. QEMU용 DTB만
+PL011을 `serial0`으로 지정하고 그 하위 Bluetooth 노드를 비활성화한다.
+WIC의 `/boot` 항목은 장치 번호 대신 FAT filesystem UUID를 사용한다.
 
 ## 전체 빌드 순서
 
@@ -45,6 +47,7 @@ getty만 추가한다. DTB를 패치하거나 별도의 QEMU용 DTB를 만들지
 build/tmp/deploy/images/raspberrypi4-64/
 ├── Image-raspberrypi4-64.bin
 ├── bcm2711-rpi-4-b.dtb
+├── bcm2711-rpi-4-b-qemu-console.dtb
 ├── core-image-base-raspberrypi4-64.rootfs.wic
 └── core-image-base-raspberrypi4-64.rootfs.wic.bz2
 ```
@@ -85,23 +88,23 @@ bash poc/raspi4b/run-console.sh --fresh
 거듭제곱 크기로 자동 확장된다. 로그인 계정은 `root`, 비밀번호는 없다.
 게스트에서는 `poweroff`, QEMU에서는 `Ctrl-a x`로 종료한다.
 
-## 2026-08-04 검증 결과
+## 2026-08-06 검증 결과
 
-QEMU 11.0.3과 수정하지 않은 Wrynose DTB로 다음 항목을 확인했다.
+QEMU 11.0.3과 별도 QEMU 콘솔 DTB로 다음 항목을 확인했다.
 
 - `Raspberry Pi 4 Model B` 인식
 - Cortex-A72 4개 CPU 기동
 - Linux 6.18.33 부팅
 - `/dev/mmcblk1p2` rootfs 마운트 및 읽기/쓰기 remount
 - systemd 259.2 실행과 multi-user 서비스 시작
+- PL011 `ttyAMA0` 로그인, 명령 입력 및 정상 poweroff
+- UUID 기반 `/boot` 마운트
 
 공식 QEMU의 `raspi4b`는 stock DTB에서 미구현된 PCIe, RNG200, thermal,
-GENET 노드를 시작 시 비활성화한다. 또한 stock DTB는 PL011을 Bluetooth에
-연결하므로 `ttyAMA0` 대화형 입력과 Bluetooth 드라이버가 충돌할 수 있다.
-따라서 이번 무-DTB 변경 검증 범위는 systemd 부팅까지이며, 안정적인
-대화형 로그인은 별도 DTB 또는 QEMU의 UART 모델 개선 작업으로 분리한다.
+GENET 노드를 시작 시 비활성화한다. stock DTB는 PL011을 Bluetooth에
+연결하므로 QEMU 전용 DTB에서 해당 Bluetooth serdev 노드만 끈다.
 
-### 확인된 콘솔 문제
+### 콘솔 및 `/boot` 원인과 해결
 
 부팅 인자는 기존 Kirkstone/QEMU 9.2 실행과 동일하게 유지했다.
 
@@ -111,28 +114,24 @@ earlycon=pl011,0xfe201000
 root=/dev/mmcblk1p2 rootwait rw
 ```
 
-`run-console.sh`에서 달라진 실행 요소는 QEMU 바이너리가
-`qemu92-install`의 9.2에서 `qemu-install`의 11.0.3으로 바뀐 것이다.
-머신, CPU, 메모리, kernel, DTB, SD 및 콘솔 인자는 변경하지 않았다.
-
-Wrynose 부팅 로그에서 확인한 흐름은 다음과 같다.
+Wrynose stock DTB 부팅 로그에서 확인한 흐름은 다음과 같다.
 
 1. PL011 earlycon을 통해 Linux 6.18.33 로그가 정상 출력됨
 2. `/dev/mmcblk1p2`가 rootfs로 정상 마운트되고 systemd 259.2가 실행됨
 3. udev가 Bluetooth 스택과 `hci_uart_bcm`을 로드함
 4. stock DTB의 `serial0-0` Bluetooth 장치가 PL011을 사용하려고 probe함
 5. QEMU가 구현하지 않은 firmware GPIO 때문에 Bluetooth probe가 `-5`로 실패함
-6. 이후 `ttyAMA0`에서 안정적인 대화형 입력과 login 프롬프트를 확인하지 못함
+6. PL011이 `ttyAMA1`로 등록되어 `ttyAMA0` getty와 RX가 동작하지 않음
 
-진단용으로 `module_blacklist=hci_uart`를 추가했을 때 커널은 해당 모듈을
-차단했지만 제한 시간 180초 내 login 프롬프트는 확인되지 않았다. 이 옵션은
-진단 명령에서만 사용했으며 기본 실행 스크립트에는 넣지 않았다.
+QEMU 전용 DTB는 PL011을 `serial0`/`ttyAMA0`으로 되돌리고 Bluetooth
+child를 비활성화한다. 동일 Wrynose 이미지에서 QEMU 9.2와 11.0.3 모두
+stock DTB 문제를 재현했으므로 QEMU 버전 변경이 직접 원인은 아니다.
 
-현재 결론은 커널과 rootfs의 부팅 실패가 아니라 stock DTB의 PL011 소유권과
-QEMU raspi4b 입력 경로에 관련된 문제라는 것이다. 이전 환경과 정확히
-구분하려면 동일 Wrynose Kernel/DTB/WIC를 QEMU 9.2와 11.0.3에서 각각
-실행하는 A/B 테스트가 필요하다. 그다음 필요하면 Kirkstone Linux 5.15와
-Wrynose Linux 6.18을 같은 QEMU에서 비교한다.
+기본 Raspberry Pi WKS는 부트 파티션에 `--ondisk mmcblk0`을 사용한다.
+Wic이 이를 최종 `/etc/fstab`의 `/dev/mmcblk0p1 /boot` 항목으로 변환하지만,
+QEMU의 SD 카드는 `mmcblk1`이므로 systemd가 90초 동안 잘못된 장치를
+기다렸다. 전용 WKS의 `--use-uuid`로 `/boot`를 `UUID=...` 형식으로 생성해
+실물 보드와 QEMU의 장치 번호 차이를 제거했다.
 
 ## 자동 테스트 하니스
 
