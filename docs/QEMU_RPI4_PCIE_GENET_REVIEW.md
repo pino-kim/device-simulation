@@ -1,4 +1,4 @@
-# QEMU 11.0.3 Raspberry Pi 4 PCIe/GENET review
+# QEMU 11.0.3 Raspberry Pi 4 PCIe/GENET/USB review
 
 ## Scope
 
@@ -14,6 +14,8 @@ Tested components:
 - Linux 6.18.33-v8
 - `bcm2711-rpi-4-b-qemu-console.dtb`
 - UUID-portable `core-image-base` WIC
+- PCIe `virtio-net-pci` and `qemu-xhci` endpoints
+- SanDisk Cruzer Blade `0781:5567` physical USB storage
 
 ## Patch review
 
@@ -137,6 +139,45 @@ PASS: Guest(192.168.78.2) <-> Host(192.168.78.1) 양방향 ping
 This specifically validates downstream PCI configuration access, bridge MMIO
 window programming, BAR access and packet delivery through a PCIe endpoint.
 
+### PCIe xHCI and physical USB storage test
+
+The interactive runner attached QEMU's generic xHCI endpoint behind the patched
+BCM2711 root port and passed one host usbfs device into the container:
+
+```text
+-device qemu-xhci,bus=pcie.1,id=xhci,msi=off,msix=off
+-device usb-host,bus=xhci.0,hostbus=1,hostaddr=23
+```
+
+The guest enumerated the endpoint, assigned its 64-bit BAR and initialized both
+xHCI root buses:
+
+```text
+pci 0000:01:00.0: [1b36:000d] class 0x0c0330 PCIe Endpoint
+pci 0000:01:00.0: BAR 0 [mem 0x600000000-0x600003fff 64bit]: assigned
+xhci_hcd 0000:01:00.0: xHCI Host Controller
+xhci_hcd 0000:01:00.0: Host supports USB 3.0 SuperSpeed
+```
+
+A physical SanDisk Cruzer Blade `0781:5567` was then detected through
+`usb-host`, bound to `usb-storage`, exposed as SCSI disk `/dev/sda`, and
+partitioned as `/dev/sda1`. Reading the first 4 MiB without writing to the
+device succeeded:
+
+```text
+usb 1-1: Product: Cruzer Blade
+usb-storage 1-1:1.0: USB Mass Storage device detected
+sda: sda1
+c77820efbdee614c8f3c2afc104a4e8bd3ad58d160ba976cab5cff52f1243974  -
+USB_RAW_READ_PASS
+```
+
+QEMU released the device on shutdown and the host rediscovered `/dev/sda1`.
+This validates PCIe configuration and BAR access, xHCI initialization, libusb
+host-device forwarding, USB mass-storage, SCSI enumeration and guest block
+reads. The complete procedure and captured results are recorded in
+[`RPI4_PCIE_USB_STORAGE_TEST.md`](RPI4_PCIE_USB_STORAGE_TEST.md).
+
 ## Known limitations
 
 - QEMU still disables the unimplemented BCM2711 RNG200 and thermal nodes.
@@ -145,6 +186,13 @@ window programming, BAR access and packet delivery through a PCIe endpoint.
 - The namespace tests validate host/guest L2 and IPv4 connectivity, not host
   NAT or Internet access.
 - Physical PCIe passthrough is outside the scope of the emulated root complex.
+- QEMU uses its generic `qemu-xhci` endpoint; it does not emulate the physical
+  Raspberry Pi 4 VL805 controller.
+- The tested Cruzer Blade negotiated USB 2.0 High-Speed at 480 Mbit/s. The xHCI
+  SuperSpeed capability was detected, but a physical USB 3 device and USB 3
+  throughput were not tested.
+- The guest created and read the NTFS partition block device, but could not
+  mount it because the current `core-image-base` lacks NTFS3 or `ntfs-3g`.
 
 ## Reproduction
 
@@ -162,4 +210,22 @@ unshare --user --map-root-user --net \
 
 unshare --user --map-root-user --net \
   env BOOT_TIMEOUT=90 ./test-rpi4-pcie-network.sh
+
+lsusb
+lsblk
+# Unmount the selected USB partition first if the host mounted it.
+sudo umount /dev/sdX1
+
+RPI4_USB_BUS=1 RPI4_USB_ADDR=23 \
+  bash poc/raspi4b/run-console.sh --fresh
+
+# In the guest:
+lspci -nn
+lsusb -t
+cat /proc/partitions
+set -o pipefail
+dd if=/dev/sda1 bs=1M count=4 2>/dev/null | sha256sum
 ```
+
+The USB Bus/Device values and `/dev/sdX1` path are examples from the recorded
+test and must be replaced with the current `lsusb` and `lsblk` results.
