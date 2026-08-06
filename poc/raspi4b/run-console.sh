@@ -89,6 +89,6 @@ exec docker run --rm -it \
     -nographic \
     -no-reboot \
     -kernel /workdir/build/tmp/deploy/images/raspberrypi4-64/Image-raspberrypi4-64.bin \
-    -dtb /workdir/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b.dtb \
+    -dtb /workdir/build/tmp/deploy/images/raspberrypi4-64/bcm2711-rpi-4-b-qemu-console.dtb \
     -drive file=/workdir/poc/raspi4b/rpi4b-console.wic,format=raw,if=sd \
     -append "console=ttyAMA0,115200 earlycon=pl011,0xfe201000 root=/dev/mmcblk1p2 rootwait rw"
