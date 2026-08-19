@@ -30,6 +30,8 @@ SERIAL_CONSOLES = "115200;ttyAMA0"
 EXTRA_IMAGE_FEATURES += "allow-empty-password empty-root-password allow-root-login serial-autologin-root"
 IMAGE_FSTYPES = "wic wic.bz2"
 LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
+DISTRO_FEATURES:append = " wayland opengl pam"
+PACKAGECONFIG:append:pn-weston-init = " use-pixman no-idle-timeout"
 EOF
 
 echo "===== Active layers ====="
