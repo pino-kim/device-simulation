@@ -1,0 +1,113 @@
+From: Device Simulation <device-simulation@example.com>
+Date: Wed, 19 Aug 2026 08:35:00 +0000
+Subject: [PATCH] hw/ssi/bcm2835: drive peripheral chip select
+
+The BCM2835 SPI controller transferred bytes without updating the SSI
+peripheral chip-select input. Stateful peripherals such as SPI NOR therefore
+could not delimit commands and returned corrupt data. Drive native CS0..CS2
+from the controller CS/TA fields and route the Raspberry Pi 4 GPIO chip-select
+lines used by the board DT to the same SSI peripherals.
+
+Signed-off-by: Device Simulation <device-simulation@example.com>
+---
+ hw/arm/bcm2838_peripherals.c |  5 +++++
+ hw/ssi/bcm2835_spi.c         | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+
+diff --git a/hw/ssi/bcm2835_spi.c b/hw/ssi/bcm2835_spi.c
+index 79005c629a..b0c36dc4f0 100644
+--- a/hw/ssi/bcm2835_spi.c
++++ b/hw/ssi/bcm2835_spi.c
+@@ -29,6 +29,50 @@
+ #include "hw/core/irq.h"
+ #include "migration/vmstate.h"
+ 
++static void bcm2835_spi_update_cs(BCM2835SPIState *s)
++{
++    unsigned int cs;
++
++    /* CS=3 disables native chip select; GPIO chip select owns the lines. */
++    if ((s->cs & 0x3) == 0x3) {
++        return;
++    }
++
++    for (cs = 0; cs < 3; cs++) {
++        DeviceState *dev = ssi_get_cs(s->bus, cs);
++        SSIPeripheral *peripheral;
++
++        if (!dev) {
++            continue;
++        }
++
++        peripheral = SSI_PERIPHERAL(dev);
++        if (peripheral->spc->cs_polarity == SSI_CS_NONE) {
++            continue;
++        }
++
++        qemu_set_irq(qdev_get_gpio_in_named(dev, SSI_GPIO_CS, 0),
++                     !(s->cs & BCM2835_SPI_CS_TA &&
++                       (s->cs & 0x3) == cs));
++    }
++}
++
++static void bcm2835_spi_gpio_cs(void *opaque, int n, int level)
++{
++    BCM2835SPIState *s = opaque;
++    DeviceState *dev = ssi_get_cs(s->bus, n);
++    SSIPeripheral *peripheral;
++
++    if (!dev) {
++        return;
++    }
++
++    peripheral = SSI_PERIPHERAL(dev);
++    if (peripheral->spc->cs_polarity != SSI_CS_NONE) {
++        qemu_set_irq(qdev_get_gpio_in_named(dev, SSI_GPIO_CS, 0), level);
++    }
++}
++
+ static void bcm2835_spi_update_int(BCM2835SPIState *s)
+ {
+     int do_interrupt = 0;
+@@ -177,6 +221,7 @@ static void bcm2835_spi_write(void *opaque, hwaddr addr,
+                           "LoSSI not supported\n", __func__);
+         }
+ 
++        bcm2835_spi_update_cs(s);
+         bcm2835_spi_update_int(s);
+         break;
+     case BCM2835_SPI_FIFO:
+@@ -229,6 +274,7 @@ static void bcm2835_spi_realize(DeviceState *dev, Error **errp)
+                           TYPE_BCM2835_SPI, 0x18);
+     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+     sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq);
++    qdev_init_gpio_in_named(dev, bcm2835_spi_gpio_cs, "gpio-cs", 3);
+ 
+     fifo8_create(&s->tx_fifo, FIFO_SIZE);
+     fifo8_create(&s->rx_fifo, FIFO_SIZE);
+@@ -242,6 +288,7 @@ static void bcm2835_spi_reset(DeviceState *dev)
+ 
+     /* Reset values according to BCM2835 Peripheral Documentation */
+     s->cs = BCM2835_SPI_CS_TXD | BCM2835_SPI_CS_REN;
++    bcm2835_spi_update_cs(s);
+     s->clk = 0;
+     s->dlen = 0;
+     s->ltoh = 0x1;
+diff --git a/hw/arm/bcm2838_peripherals.c b/hw/arm/bcm2838_peripherals.c
+index 8d8de820e2..a7ce7ba20d 100644
+--- a/hw/arm/bcm2838_peripherals.c
++++ b/hw/arm/bcm2838_peripherals.c
+@@ -224,6 +224,11 @@ static void bcm2838_peripherals_realize(DeviceState *dev, Error **errp)
+         &s_base->peri_mr, GPIO_OFFSET,
+         sysbus_mmio_get_region(SYS_BUS_DEVICE(&s->gpio), 0));
+ 
++    qdev_connect_gpio_out(DEVICE(&s->gpio), 8,
++        qdev_get_gpio_in_named(DEVICE(&s_base->spi[0]), "gpio-cs", 0));
++    qdev_connect_gpio_out(DEVICE(&s->gpio), 7,
++        qdev_get_gpio_in_named(DEVICE(&s_base->spi[0]), "gpio-cs", 1));
++
+     object_property_add_alias(OBJECT(s), "sd-bus", OBJECT(&s->gpio), "sd-bus");
+ 
+     /* BCM2838 RPiVid ASB must be mapped to prevent kernel crash */
+-- 
+2.43.0

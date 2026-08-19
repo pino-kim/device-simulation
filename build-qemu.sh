@@ -28,8 +28,8 @@ tar -xf "$ARCHIVE"
 PATCH_DIR="/workdir/qemu-patches/20260725-rpi4-pcie-genet"
 mapfile -t QEMU_PATCHES < <(find "$PATCH_DIR" -maxdepth 1 -type f \
     -name '*.patch' -print | sort)
-if [ "${#QEMU_PATCHES[@]}" -ne 24 ]; then
-    echo "Expected 24 Raspberry Pi PCIe/GENET patches in: $PATCH_DIR" >&2
+if [ "${#QEMU_PATCHES[@]}" -ne 25 ]; then
+    echo "Expected 25 Raspberry Pi patches in: $PATCH_DIR" >&2
     exit 1
 fi
 for qemu_patch in "${QEMU_PATCHES[@]}"; do
