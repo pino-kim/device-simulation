@@ -48,7 +48,7 @@ cd "${SOURCE}-build"
     --disable-docs \
     --disable-gtk \
     --disable-sdl \
-    --disable-vnc
+    --enable-vnc
 
 ninja -j "$JOBS"
 ninja install
