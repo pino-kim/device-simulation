@@ -87,16 +87,17 @@ Yocto `core-image-base` 빌드는 6,687개 task가 모두 성공했다. 생성�
 
 - [정지 화면](../artifacts/rpi4-weston-presentation-shm.png)
 - [15 FPS GIF](../artifacts/rpi4-weston-presentation-shm.gif)
-- [30 FPS MP4](../artifacts/rpi4-weston-presentation-shm.mp4)
+- [15 FPS MP4](../artifacts/rpi4-weston-presentation-shm.mp4)
+- [캡처 측정값](../artifacts/rpi4-weston-presentation-shm.metrics.txt)
 
-최종 녹화는 QEMU monitor의 framebuffer를 15 FPS 목표로 120프레임 캡처했다.
-측정 결과는 7.967초 동안 120프레임, 평균 15.06 FPS였다. GIF는 원본 프레임을
-약 15 FPS로 보존했고 MP4는 시청 시 부드럽도록 motion interpolation을 적용해
-30 FPS로 인코딩했다. 서로 떨어진 다섯 표본 프레임의 SHA-256 값이 모두 달라
-실제 화면 갱신도 확인했다.
+최종 녹화는 새 QEMU 부팅에서 monitor framebuffer를 15 FPS 목표로 150프레임
+다시 캡처했다. 측정 결과는 9.964초 동안 150프레임, 평균 15.05 FPS였다.
+평균 프레임 간격은 66.667 ms이고 최소/최대 간격은 각각 66.539/66.806 ms로
+일정했다. GIF와 MP4 모두 새 원본 프레임을 보간 없이 15 FPS로 보존했다.
+서로 떨어진 표본 프레임의 SHA-256 값 변화로 실제 화면 갱신도 확인했다.
 
-이 MP4의 30 FPS는 녹화 파일의 출력 프레임률이지 게스트의 실제 렌더링 성능
-측정값은 아니다. 실제 compositor frame timing은 presentation feedback이나
+이 15 FPS 값은 QEMU framebuffer를 관찰한 캡처 속도이지 게스트의 실제 최대
+렌더링 성능 측정값은 아니다. 실제 compositor frame timing은 presentation feedback이나
 Weston 계측 결과로 별도 평가해야 한다. 이전 영상이 끊겨 보였던 원인은 Weston
 문제가 아니라 0.5초 간격, 즉 2 FPS로 캡처했기 때문이다.
 

@@ -1,0 +1,8 @@
+fresh_capture=true
+frames=150
+elapsed_seconds=9.963687
+actual_fps=15.054667
+target_fps=15.0
+mean_interval_ms=66.667124
+min_interval_ms=66.538986
+max_interval_ms=66.805518
