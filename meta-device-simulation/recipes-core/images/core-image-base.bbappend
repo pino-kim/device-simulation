@@ -9,5 +9,9 @@ IMAGE_FEATURES:append:raspberrypi4-64 = " weston"
 # surface composition, continuous SHM updates, EGL, and presentation timing.
 IMAGE_INSTALL:append:raspberrypi4-64 = " weston-examples"
 
+# Phase 1 virtual camera: create a V4L2 capture node, feed a synthetic test
+# pattern into it, and preview that stream through a native Wayland sink.
+IMAGE_INSTALL:append:raspberrypi4-64 = " v4l2loopback virtual-camera-demo"
+
 # Provide userspace erase/read/write tools for QEMU SPI NOR validation.
 IMAGE_INSTALL:append:raspberrypi4-64 = " mtd-utils"

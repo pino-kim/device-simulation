@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euo pipefail
+
+DEVICE=${VIRTUAL_CAMERA_DEVICE:-/dev/video10}
+XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run}
+
+if [ ! -e "$DEVICE" ]; then
+    echo "Virtual camera is missing: ${DEVICE}" >&2
+    echo "Start virtual-camera-feed first." >&2
+    exit 1
+fi
+
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    for socket in "$XDG_RUNTIME_DIR"/wayland-*; do
+        if [ -S "$socket" ]; then
+            WAYLAND_DISPLAY=${socket##*/}
+            break
+        fi
+    done
+fi
+
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    echo "No Weston Wayland socket found in ${XDG_RUNTIME_DIR}" >&2
+    exit 1
+fi
+
+export XDG_RUNTIME_DIR WAYLAND_DISPLAY
+echo "Previewing ${DEVICE} on ${WAYLAND_DISPLAY}"
+exec gst-launch-1.0 -v v4l2src device="$DEVICE" io-mode=mmap \
+    ! videoconvert \
+    ! waylandsink sync=false

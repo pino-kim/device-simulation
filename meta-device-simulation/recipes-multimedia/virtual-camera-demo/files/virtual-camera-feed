@@ -1,0 +1,19 @@
+#!/bin/bash
+set -euo pipefail
+
+DEVICE=${VIRTUAL_CAMERA_DEVICE:-/dev/video10}
+WIDTH=${VIRTUAL_CAMERA_WIDTH:-640}
+HEIGHT=${VIRTUAL_CAMERA_HEIGHT:-480}
+FPS=${VIRTUAL_CAMERA_FPS:-30}
+PATTERN=${VIRTUAL_CAMERA_PATTERN:-ball}
+
+if [ ! -e "$DEVICE" ]; then
+    modprobe v4l2loopback video_nr="${DEVICE#/dev/video}" \
+        card_label=QEMU-Virtual-Camera exclusive_caps=1 max_buffers=4
+fi
+
+echo "Feeding ${PATTERN} ${WIDTH}x${HEIGHT}@${FPS} to ${DEVICE}"
+exec gst-launch-1.0 -v videotestsrc is-live=true pattern="$PATTERN" \
+    ! "video/x-raw,format=YUY2,width=${WIDTH},height=${HEIGHT},framerate=${FPS}/1" \
+    ! queue \
+    ! v4l2sink device="$DEVICE" sync=false
