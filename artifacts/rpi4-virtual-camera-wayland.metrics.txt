@@ -1,0 +1,7 @@
+target_fps=15
+frames=150
+elapsed_seconds=9.933387
+measured_fps=14.9999
+mean_interval_ms=66.667
+min_interval_ms=66.451
+max_interval_ms=66.865

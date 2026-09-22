@@ -15,6 +15,9 @@
 | [`RPI4_PCIE_USB_STORAGE_TEST.md`](RPI4_PCIE_USB_STORAGE_TEST.md) | SanDisk 물리 USB 저장장치 전달 및 raw-read 상세 시험 |
 | [`WRYNOSE_BOOT_MOUNT_ANALYSIS.md`](WRYNOSE_BOOT_MOUNT_ANALYSIS.md) | `/boot` 장치 번호 문제와 filesystem UUID 해결 분석 |
 | [`RPI4_DMESG_IMPLEMENTATION_STATUS.md`](RPI4_DMESG_IMPLEMENTATION_STATUS.md) | 실제 콘솔 부팅 dmesg 기반 모듈별 구현·미구현 현황 |
+| [`RPI4_WAYLAND_VIRTIO_GPU_VALIDATION.md`](RPI4_WAYLAND_VIRTIO_GPU_VALIDATION.md) | virtio-gpu 기반 Weston/Wayland, USB 입력 및 15 FPS 화면 검증 |
+| [`RPI4_VIRTUAL_CAMERA_PHASE1_VALIDATION.md`](RPI4_VIRTUAL_CAMERA_PHASE1_VALIDATION.md) | v4l2loopback 가상 카메라, Wayland preview 및 15 FPS 녹화 검증 |
+| [`RPI4_VIRTUAL_CAMERA_PHASE1_JIRA_COMMENTS.md`](RPI4_VIRTUAL_CAMERA_PHASE1_JIRA_COMMENTS.md) | Camera Phase 1 작업 이력용 Jira comment 초안 |
 
 최신 실행 명령은 프로젝트 루트 [`README.md`](../README.md)를 우선한다.
 
